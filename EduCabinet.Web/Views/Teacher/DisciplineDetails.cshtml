@@ -1,0 +1,195 @@
+@model Discipline
+@{
+    ViewData["Title"] = "Структура: " + Model.Title;
+}
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-action="Disciplines">Дисциплины</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.Title</li>
+    </ol>
+</nav>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div>
+                <span class="badge bg-primary mb-2">Учебная дисциплина</span>
+                <h3 class="fw-bold mb-1">@Model.Title</h3>
+                <p class="text-muted mb-0">@Model.Description</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#newAnnouncementCollapse">
+                    <i class="bi bi-megaphone me-1"></i> Опубликовать объявление
+                </button>
+                <a asp-action="EditDiscipline" asp-route-id="@Model.Id" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-pencil me-1"></i> Редактировать дисциплину
+                </a>
+                <a asp-action="CreateTopic" asp-route-disciplineId="@Model.Id" class="btn btn-primary btn-sm">
+                    <i class="bi bi-folder-plus me-1"></i> Добавить тему
+                </a>
+            </div>
+        </div>
+
+        <!-- Форма добавления объявления (сворачиваемая) -->
+        <div class="collapse mt-3 pt-3 border-top" id="newAnnouncementCollapse">
+            <h6 class="fw-bold mb-2 text-primary"><i class="bi bi-megaphone-fill me-1"></i>Новое объявление для студентов курса</h6>
+            <form asp-action="AddAnnouncement" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="disciplineId" value="@Model.Id" />
+                <div class="row g-2 mb-2">
+                    <div class="col-md-9">
+                        <input type="text" name="title" class="form-control form-control-sm" placeholder="Заголовок объявления (например: Важное обновление к лабораторной)" required />
+                    </div>
+                    <div class="col-md-3 d-flex align-items-center">
+                        <div class="form-check form-switch mb-0">
+                            <input class="form-check-input" type="checkbox" name="isPinned" value="true" id="isPinnedCheck" checked>
+                            <label class="form-check-label small" for="isPinnedCheck">Закрепить вверху</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-2">
+                    <textarea name="content" class="form-control form-control-sm" rows="2" placeholder="Текст объявления (дедлайны, аудитория, ссылки, рекомендации)..." required></textarea>
+                </div>
+                <div class="text-end">
+                    <button type="button" class="btn btn-outline-secondary btn-sm me-1" data-bs-toggle="collapse" data-bs-target="#newAnnouncementCollapse">Отмена</button>
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-send me-1"></i>Опубликовать</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@if (Model.Announcements != null && Model.Announcements.Any())
+{
+    <div class="card shadow-sm border-0 mb-4" style="border-left: 4px solid #0284c7 !important;">
+        <div class="card-header py-2 px-3 d-flex justify-content-between align-items-center">
+            <span class="fw-bold small text-body"><i class="bi bi-megaphone-fill text-info me-1"></i> Активные объявления курса (@Model.Announcements.Count)</span>
+            <small class="text-muted">Видны всем студентам дисциплины</small>
+        </div>
+        <div class="list-group list-group-flush">
+            @foreach (var ann in Model.Announcements)
+            {
+                <div class="list-group-item p-3 d-flex justify-content-between align-items-start gap-3">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            @if (ann.IsPinned)
+                            {
+                                <span class="badge bg-warning text-dark"><i class="bi bi-pin-angle-fill me-1"></i>Закреплено</span>
+                            }
+                            <strong class="text-body">@ann.Title</strong>
+                            <small class="text-muted">(@ann.CreatedAt.ToString("dd.MM.yyyy HH:mm"))</small>
+                        </div>
+                        <p class="mb-0 text-secondary small">@ann.Content</p>
+                    </div>
+                    <form asp-action="DeleteAnnouncement" method="post" onsubmit="return confirm('Удалить это объявление?');">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="id" value="@ann.Id" />
+                        <input type="hidden" name="disciplineId" value="@Model.Id" />
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Удалить объявление">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+<div class="d-grid gap-4">
+    @if (!Model.Topics.Any())
+    {
+        <div class="card p-5 text-center text-muted border-dashed">
+            <i class="bi bi-folder-x fs-1 text-secondary mb-2"></i>
+            <h5>В дисциплине еще нет тем</h5>
+            <p class="small">Создайте первую тему, чтобы разместить в ней лекции и контрольные материалы.</p>
+            <div>
+                <a asp-action="CreateTopic" asp-route-disciplineId="@Model.Id" class="btn btn-primary btn-sm">
+                    <i class="bi bi-folder-plus me-1"></i> Создать тему
+                </a>
+            </div>
+        </div>
+    }
+
+    @foreach (var topic in Model.Topics.OrderBy(t => t.OrderIndex))
+    {
+        <div class="card shadow-sm border-0">
+            <div class="card-header py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-dark">Тема #@topic.OrderIndex</span>
+                    <h5 class="fw-bold mb-0 text-primary">@topic.Title</h5>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <a asp-action="CreateLecture" asp-route-topicId="@topic.Id" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-file-earmark-plus me-1"></i> Добавить лекцию
+                    </a>
+                    <a asp-action="EditTopic" asp-route-id="@topic.Id" class="btn btn-sm btn-outline-secondary" title="Редактировать тему">
+                        <i class="bi bi-pencil"></i>
+                    </a>
+                    <form asp-action="DeleteTopic" asp-route-id="@topic.Id" method="post" class="d-inline" onsubmit="return confirm('Удалить тему со всеми лекциями?')">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Удалить тему">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrEmpty(topic.Description))
+            {
+                <div class="px-4 py-2 bg-light border-bottom text-muted small">
+                    @topic.Description
+                </div>
+            }
+
+            <div class="list-group list-group-flush">
+                @if (!topic.Lectures.Any())
+                {
+                    <div class="p-3 text-center text-muted small fst-italic">
+                        В этой теме пока нет лекций. Нажмите «Добавить лекцию».
+                    </div>
+                }
+                @foreach (var lec in topic.Lectures.OrderBy(l => l.OrderIndex))
+                {
+                    <div class="list-group-item p-3">
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <div>
+                                <span class="badge bg-secondary me-1">Лекция @lec.OrderIndex</span>
+                                <a asp-action="LectureDetails" asp-route-id="@lec.Id" class="fw-bold text-body text-decoration-none fs-6">
+                                    @lec.Title
+                                </a>
+                                <div class="text-muted small mt-1 d-flex flex-wrap gap-2">
+                                    @if (!string.IsNullOrEmpty(lec.AttachmentOriginalName))
+                                    {
+                                        <span><i class="bi bi-file-earmark-pdf text-danger me-1"></i>@lec.AttachmentOriginalName</span>
+                                    }
+                                    <span><i class="bi bi-question-circle text-primary me-1"></i>Вопросов: @lec.ControlQuestions.Count</span>
+                                    <span><i class="bi bi-patch-check text-success me-1"></i>Тест: @(lec.Test != null ? $"активен ({lec.Test.PassingScorePercent}%)" : "нет")</span>
+                                    @if (lec.RequiresManualReview)
+                                    {
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-person-check me-1"></i>Ручная проверка эссе</span>
+                                    }
+                                </div>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-2">
+                                <a asp-action="LectureDetails" asp-route-id="@lec.Id" class="btn btn-outline-primary btn-sm" title="Контрольные вопросы и тест">
+                                    <i class="bi bi-sliders me-1"></i> Материалы и тесты
+                                </a>
+                                <a asp-action="EditLecture" asp-route-id="@lec.Id" class="btn btn-outline-secondary btn-sm" title="Редактировать теорию/файл">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form asp-action="DeleteLecture" asp-route-id="@lec.Id" method="post" class="d-inline" onsubmit="return confirm('Удалить лекцию со всеми вопросами и результатами студентов?')">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Удалить лекцию">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>

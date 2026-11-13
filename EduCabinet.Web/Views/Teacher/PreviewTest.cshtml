@@ -1,0 +1,201 @@
+@model Test
+@{
+    ViewData["Title"] = "Предпросмотр: " + Model.Title;
+}
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-action="Disciplines">Дисциплины</a></li>
+        <li class="breadcrumb-item"><a asp-action="LectureDetails" asp-route-id="@Model.LectureId">@Model.Lecture.Title</a></li>
+        <li class="breadcrumb-item"><a asp-action="EditTest" asp-route-lectureId="@Model.LectureId">Настройки теста</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Предпросмотр</li>
+    </ol>
+</nav>
+
+<!-- Предупреждающий баннер режима предпросмотра -->
+<div class="alert alert-info border shadow-sm mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-3">
+            <i class="bi bi-eye-fill fs-2 text-primary"></i>
+            <div>
+                <strong class="d-block">Режим предпросмотра теста для преподавателя</strong>
+                <span class="small text-muted">
+                    Здесь вы можете протестировать вид заданий глазами студента и сверить правильные ответы. Попытки и баллы в данном режиме не сохраняются в журнале успеваемости.
+                </span>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <button type="button" class="btn btn-sm btn-outline-primary" id="toggleAnswersBtn" onclick="toggleAnswers()">
+                <i class="bi bi-eye-slash me-1"></i> Скрыть правильные ответы
+            </button>
+            <a asp-action="EditTest" asp-route-lectureId="@Model.LectureId" class="btn btn-sm btn-primary">
+                <i class="bi bi-pencil me-1"></i> Редактировать тест
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-4">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+            <div>
+                <span class="badge bg-secondary mb-1">Дисциплина: @Model.Lecture.Topic.Discipline.Title</span>
+                <h3 class="fw-bold mb-1">@Model.Title</h3>
+                <p class="text-muted mb-0">Лекция: <strong>@Model.Lecture.Title</strong></p>
+                @if (!string.IsNullOrEmpty(Model.Description))
+                {
+                    <p class="small text-secondary mt-2 mb-0"><em>Инструкция: @Model.Description</em></p>
+                }
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+                <span class="badge bg-light text-body border p-2">
+                    <i class="bi bi-check2-circle text-success me-1"></i>Проходной: @Model.PassingScorePercent%
+                </span>
+                <span class="badge bg-light text-body border p-2">
+                    <i class="bi bi-arrow-repeat text-primary me-1"></i>Попыток: @Model.MaxAttempts
+                </span>
+                <span class="badge bg-light text-body border p-2">
+                    <i class="bi bi-stopwatch text-warning me-1"></i>Время: @(Model.TimeLimitMinutes.HasValue && Model.TimeLimitMinutes > 0 ? $"{Model.TimeLimitMinutes} мин" : "Без лимита")
+                </span>
+                <span class="badge bg-light text-body border p-2">
+                    <i class="bi bi-shuffle text-info me-1"></i>Перемешивание: @(Model.ShuffleQuestions ? "Вкл" : "Выкл")
+                </span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h5 class="fw-bold mb-3"><i class="bi bi-list-check me-2 text-primary"></i>Вопросы теста (@Model.Questions.Count)</h5>
+
+<div class="d-grid gap-3">
+    @if (!Model.Questions.Any())
+    {
+        <div class="card p-5 text-center text-muted">
+            <i class="bi bi-question-diamond fs-1 mb-2"></i>
+            <h6>В тесте пока нет вопросов.</h6>
+            <div>
+                <a asp-action="CreateTestQuestion" asp-route-testId="@Model.Id" class="btn btn-primary btn-sm mt-2">
+                    <i class="bi bi-plus-circle me-1"></i> Добавить первый вопрос
+                </a>
+            </div>
+        </div>
+    }
+
+    @foreach (var q in Model.Questions.OrderBy(q => q.OrderIndex))
+    {
+        <div class="card shadow-sm border-0">
+            <div class="card-header py-3 border-bottom d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-dark">Вопрос #@q.OrderIndex</span>
+                    <span class="badge bg-light text-body border">@q.Type</span>
+                    <span class="badge bg-info-subtle text-info border">@q.Points б.</span>
+                </div>
+                <a asp-action="EditTestQuestion" asp-route-id="@q.Id" class="btn btn-sm btn-outline-secondary" title="Редактировать">
+                    <i class="bi bi-pencil"></i>
+                </a>
+            </div>
+
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-3">@q.Text</h6>
+
+                @if (q.Type == QuestionType.SingleChoice || q.Type == QuestionType.MultipleChoice)
+                {
+                    <div class="list-group">
+                        @foreach (var opt in q.Options.OrderBy(o => o.OrderIndex))
+                        {
+                            <div class="list-group-item d-flex justify-content-between align-items-center @(opt.IsCorrect ? "answer-correct-highlight list-group-item-success" : "")">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi @(q.Type == QuestionType.SingleChoice ? "bi-circle" : "bi-square") text-muted"></i>
+                                    <span>@opt.Text</span>
+                                </div>
+                                @if (opt.IsCorrect)
+                                {
+                                    <span class="badge bg-success answer-badge"><i class="bi bi-check2 me-1"></i>Правильный ответ</span>
+                                }
+                            </div>
+                        }
+                    </div>
+                }
+                else if (q.Type == QuestionType.ShortText || q.Type == QuestionType.FillBlank)
+                {
+                    <div class="p-3 bg-light rounded border">
+                        <div class="text-muted small mb-1">Студент вводит текстовый ответ:</div>
+                        <input type="text" class="form-control mb-2" placeholder="Поле ввода ответа студента..." disabled />
+                        <div class="answer-correct-highlight p-2 bg-success-subtle text-success rounded small fw-bold">
+                            <i class="bi bi-check-circle me-1"></i>Эталонный правильный ответ: «@q.CorrectTextAnswer»
+                            @if (!string.IsNullOrEmpty(q.SynonymsCsv))
+                            {
+                                <span class="d-block text-muted fw-normal mt-1">Допустимые синонимы: @q.SynonymsCsv</span>
+                            }
+                        </div>
+                    </div>
+                }
+                else if (q.Type == QuestionType.Matching)
+                {
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 50%;">Понятие (Элемент)</th>
+                                    <th style="width: 50%;">Соответствие (Правильная пара)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var opt in q.Options.OrderBy(o => o.OrderIndex))
+                                {
+                                    <tr>
+                                        <td class="fw-semibold">@opt.Text</td>
+                                        <td class="answer-correct-highlight text-success fw-bold">
+                                            <i class="bi bi-arrow-right-short me-1"></i>@opt.MatchingKey
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+                else if (q.Type == QuestionType.OpenEnded)
+                {
+                    <div class="p-3 bg-light rounded border">
+                        <div class="text-muted small mb-1">Развёрнутый ответ студента (эссе):</div>
+                        <textarea class="form-control mb-2" rows="3" placeholder="Студент пишет подробное обоснование..." disabled></textarea>
+                        <span class="badge bg-warning text-dark">
+                            <i class="bi bi-pen me-1"></i>Оценивается вручную преподавателем в разделе «Ручная проверка»
+                        </span>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<script>
+    let answersVisible = true;
+    function toggleAnswers() {
+        answersVisible = !answersVisible;
+        const highlights = document.querySelectorAll('.answer-correct-highlight');
+        const badges = document.querySelectorAll('.answer-badge');
+        const btn = document.getElementById('toggleAnswersBtn');
+
+        highlights.forEach(el => {
+            if (answersVisible) {
+                el.classList.add('list-group-item-success');
+                el.style.opacity = '1';
+            } else {
+                el.classList.remove('list-group-item-success');
+                el.style.opacity = '0.8';
+            }
+        });
+
+        badges.forEach(el => {
+            el.style.display = answersVisible ? 'inline-block' : 'none';
+        });
+
+        if (answersVisible) {
+            btn.innerHTML = '<i class="bi bi-eye-slash me-1"></i> Скрыть правильные ответы';
+        } else {
+            btn.innerHTML = '<i class="bi bi-eye me-1"></i> Показать правильные ответы';
+        }
+    }
+</script>

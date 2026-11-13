@@ -1,0 +1,158 @@
+@{
+    ViewData["Title"] = "Главная - TechHub";
+}
+
+<!-- 1. Hero-секция с анимированными орбитальными сферами (синяя и фиолетовая) -->
+<div class="landing-hero position-relative overflow-hidden">
+    <!-- Фоновые анимированные сферы, плавно движущиеся по орбите -->
+    <div class="hero-orb-wrapper" aria-hidden="true">
+        <div class="hero-orb hero-orb-blue"></div>
+        <div class="hero-orb hero-orb-purple"></div>
+    </div>
+
+    <div class="landing-split position-relative" style="z-index: 1;">
+        <div>
+            <div class="d-inline-flex align-items-center gap-2 mb-3 px-3 py-1 rounded-pill" style="background: var(--bg-surface-raised); border: 1px solid var(--hairline); font-size: 0.8rem;">
+                <span class="d-inline-block rounded-circle bg-success" style="width: 8px; height: 8px;"></span>
+                <span class="text-secondary fw-medium">Платформа TechHub активна</span>
+            </div>
+
+            <h1 class="mb-3 fw-bold">
+                Образовательная платформа TechHub
+            </h1>
+
+            <p class="text-secondary mb-4" style="max-width: 580px; font-size: 1rem; line-height: 1.6;">
+                Единая образовательная среда для управления дисциплинами, проведения лекций, рубежного контроля и мониторинга успеваемости студентов с 1 по 4 курс.
+            </p>
+
+            <div class="d-flex flex-wrap gap-2">
+                <a asp-controller="Account" asp-action="Login" class="btn btn-primary px-4 py-2 shadow-sm d-inline-flex align-items-center gap-2">
+                    <i class="bi bi-box-arrow-in-right"></i>
+                    <span>Войти в TechHub</span>
+                </a>
+                <a asp-controller="Account" asp-action="Register" class="btn btn-secondary px-4 py-2 d-inline-flex align-items-center gap-2">
+                    <i class="bi bi-person-plus"></i>
+                    <span>Регистрация студента</span>
+                </a>
+            </div>
+        </div>
+
+        <div>
+            <!-- Информационная карточка быстрого доступа к кабинетам -->
+            <div class="portal-role-card p-4 rounded-3" style="background: var(--bg-surface-raised); border: 1px solid var(--hairline); box-shadow: var(--shadow-sm);">
+                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 32px; height: 32px; background: var(--primary-glow); color: var(--primary);">
+                            <i class="bi bi-mortarboard-fill"></i>
+                        </span>
+                        <span class="fw-semibold" style="font-size: 0.9rem;">Вход в кабинет</span>
+                    </div>
+                    <span class="quiet-tag positive font-mono">1–4 курсы</span>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <a asp-controller="Account" asp-action="Login" class="portal-nav-btn p-3 rounded-2 text-decoration-none d-flex align-items-center justify-content-between" style="background: var(--bg-surface); border: 1px solid var(--hairline);">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="portal-btn-icon bg-primary-subtle text-primary p-2 rounded">
+                                <i class="bi bi-person-workspace fs-5"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold text-primary" style="font-size: 0.9rem;">Кабинет преподавателя / Администратора</div>
+                                <div class="text-muted small">Журнал успеваемости, лекции и тесты</div>
+                            </div>
+                        </div>
+                        <i class="bi bi-arrow-right text-primary"></i>
+                    </a>
+
+                    <a asp-controller="Account" asp-action="Register" class="portal-nav-btn p-3 rounded-2 text-decoration-none d-flex align-items-center justify-content-between" style="background: var(--bg-surface); border: 1px solid var(--hairline);">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="portal-btn-icon bg-success-subtle text-success p-2 rounded">
+                                <i class="bi bi-person-check fs-5"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold text-success" style="font-size: 0.9rem;">Регистрация студента</div>
+                                <div class="text-muted small">Зачисление по инвайт-кодам групп (111–415)</div>
+                            </div>
+                        </div>
+                        <i class="bi bi-arrow-right text-success"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. Метрики платформы -->
+<div class="stat-row mb-4">
+    <div class="stat-tile">
+        <div class="stat-label">Курсы обучения</div>
+        <div class="stat-value">1–4</div>
+        <div class="stat-sub">Сроки: 3 и 4 года</div>
+    </div>
+    <div class="stat-tile">
+        <div class="stat-label">Учебные группы</div>
+        <div class="stat-value">@(ViewBag.GroupsCount ?? 20)</div>
+        <div class="stat-sub">Номера: 111–115, 211–415</div>
+    </div>
+    <div class="stat-tile">
+        <div class="stat-label">Банк вопросов</div>
+        <div class="stat-value">6 типов</div>
+        <div class="stat-sub">Тесты, эссе, соответствия</div>
+    </div>
+    <div class="stat-tile">
+        <div class="stat-label">Контроль доступа</div>
+        <div class="stat-value">Инвайт-коды</div>
+        <div class="stat-sub">Защита от чужих групп</div>
+    </div>
+</div>
+
+<!-- 3. Ключевые возможности системы -->
+<div class="row g-3">
+    <div class="col-md-6 col-lg-3">
+        <div class="craft-card p-3 h-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-diagram-3 text-primary"></i>
+                <h6 class="mb-0 fw-semibold">Последовательный доступ</h6>
+            </div>
+            <p class="small text-muted mb-0">
+                Переход к следующей лекции открывается только после успешной сдачи теста по предыдущей теме.
+            </p>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="craft-card p-3 h-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-ui-checks-grid text-primary"></i>
+                <h6 class="mb-0 fw-semibold">6 типов контроля</h6>
+            </div>
+            <p class="small text-muted mb-0">
+                Выбор одного или нескольких ответов, ввод числа, соответствие, ранжирование и ручная проверка эссе.
+            </p>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="craft-card p-3 h-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-file-earmark-spreadsheet text-primary"></i>
+                <h6 class="mb-0 fw-semibold">Академический журнал</h6>
+            </div>
+            <p class="small text-muted mb-0">
+                Сводная ведомость успеваемости по группам, расчет средних баллов и экспорт в Excel в один клик.
+            </p>
+        </div>
+    </div>
+
+    <div class="col-md-6 col-lg-3">
+        <div class="craft-card p-3 h-100">
+            <div class="d-flex align-items-center gap-2 mb-2">
+                <i class="bi bi-shield-lock text-primary"></i>
+                <h6 class="mb-0 fw-semibold">Безопасность доступа</h6>
+            </div>
+            <p class="small text-muted mb-0">
+                Инвайт-токены для преподавателей, инвайт-коды групп для студентов и резервное копирование SQLite.
+            </p>
+        </div>
+    </div>
+</div>

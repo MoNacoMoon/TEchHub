@@ -1,0 +1,549 @@
+@model TeacherStudentsPageViewModel
+@{
+    ViewData["Title"] = "Учебные группы и студенты";
+    int totalStudents = Model.TotalStudentsCount;
+    int totalGroups = Model.TotalGroupsCount;
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+        <h2 class="fw-bold mb-1">Учебные группы и курсы</h2>
+        <p class="text-muted mb-0">Организация групп по 1–4 курсам (111–415), сроки обучения (3 и 4 года) и инвайт-коды</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Reports" class="btn btn-outline-primary">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Сводный журнал
+        </a>
+        <button class="btn btn-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#createGroupModal" onclick="initModalCourse(1)">
+            <i class="bi bi-plus-circle me-1"></i> Создать группу
+        </button>
+    </div>
+</div>
+
+<!-- Навигация и фильтрация по курсам (1..4 курс) -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4 p-2 rounded-3" style="background: var(--bg-surface); border: 1px solid var(--hairline);">
+    <div class="d-flex flex-wrap align-items-center gap-1 course-filter-scroll">
+        <button type="button" class="btn filter-pill-btn @(Model.SelectedCourse == 0 ? "active" : "")" data-course-filter="0" onclick="setCourseFilter(0)">
+            <i class="bi bi-grid-fill me-1"></i> Все курсы
+            <span class="quiet-tag font-mono ms-1">@totalGroups</span>
+        </button>
+        <button type="button" class="btn filter-pill-btn @(Model.SelectedCourse == 1 ? "active" : "")" data-course-filter="1" onclick="setCourseFilter(1)">
+            <span class="badge bg-primary-subtle text-primary me-1">1</span> 1 курс
+            <span class="quiet-tag font-mono ms-1">@Model.GroupsCountForCourse(1) групп</span>
+        </button>
+        <button type="button" class="btn filter-pill-btn @(Model.SelectedCourse == 2 ? "active" : "")" data-course-filter="2" onclick="setCourseFilter(2)">
+            <span class="badge bg-primary-subtle text-primary me-1">2</span> 2 курс
+            <span class="quiet-tag font-mono ms-1">@Model.GroupsCountForCourse(2) групп</span>
+        </button>
+        <button type="button" class="btn filter-pill-btn @(Model.SelectedCourse == 3 ? "active" : "")" data-course-filter="3" onclick="setCourseFilter(3)">
+            <span class="badge bg-primary-subtle text-primary me-1">3</span> 3 курс
+            <span class="quiet-tag font-mono ms-1">@Model.GroupsCountForCourse(3) групп</span>
+        </button>
+        <button type="button" class="btn filter-pill-btn @(Model.SelectedCourse == 4 ? "active" : "")" data-course-filter="4" onclick="setCourseFilter(4)">
+            <span class="badge bg-primary-subtle text-primary me-1">4</span> 4 курс
+            <span class="quiet-tag font-mono ms-1">@Model.GroupsCountForCourse(4) групп</span>
+        </button>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 px-2">
+        <span class="text-muted small">Всего групп: <strong class="text-primary font-mono">@totalGroups</strong></span>
+        <span class="text-muted small">•</span>
+        <span class="text-muted small">Студентов: <strong class="text-primary font-mono">@totalStudents</strong></span>
+    </div>
+</div>
+
+<!-- Сообщение, если для выбранного курса групп нет -->
+<div id="noGroupsNotice" class="col-12 my-4" style="display: none;">
+    <div class="card p-5 text-center text-muted border-dashed">
+        <i class="bi bi-people fs-1 text-secondary mb-2"></i>
+        <h5>В выбранном курсе пока нет групп</h5>
+        <p class="small">Нажмите «Создать группу», чтобы добавить учебную группу для этого курса.</p>
+        <div>
+            <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+                <i class="bi bi-plus-circle me-1"></i> Создать группу
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4" id="groupsContainer">
+    @if (!Model.Groups.Any())
+    {
+        <div class="col-12">
+            <div class="card p-5 text-center text-muted border-dashed">
+                <i class="bi bi-people fs-1 text-secondary mb-2"></i>
+                <h5>Учебные группы пока не созданы</h5>
+                <p class="small">Создайте группы для курсов 1–4, чтобы выдавать студентам инвайт-ссылки для регистрации.</p>
+                <div>
+                    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createGroupModal" onclick="initModalCourse(1)">
+                        <i class="bi bi-plus-circle me-1"></i> Создать первую группу
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+    @foreach (var g in Model.Groups)
+    {
+        <div class="col-lg-6 group-card-col" data-course="@g.CourseNumber">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                            <h5 class="fw-bold mb-0 text-primary">
+                                <i class="bi bi-people-fill me-1"></i>Группа @g.GroupName
+                            </h5>
+                            <span class="badge bg-primary-subtle text-primary font-mono" title="Курс обучения">
+                                <i class="bi bi-mortarboard me-1"></i>@g.CourseNumber курс
+                            </span>
+                            <span class="quiet-tag font-mono" title="Срок обучения специальности">
+                                <i class="bi bi-clock-history me-1"></i>@g.StudyDurationYears года
+                            </span>
+                            <span class="quiet-tag font-mono text-primary fw-semibold" style="cursor: pointer;" onclick="copyGroupInviteCode('@g.InviteCode', '@g.GroupName')" title="Нажмите, чтобы скопировать только инвайт-код (@g.InviteCode)">
+                                <i class="bi bi-key-fill me-1"></i>@g.InviteCode
+                                <i class="bi bi-clipboard ms-1 text-muted" style="font-size: 0.75rem;"></i>
+                            </span>
+                        </div>
+                        @if (!string.IsNullOrEmpty(g.Description))
+                        {
+                            <div class="text-muted small mt-1">@g.Description</div>
+                        }
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 shadow-none" 
+                                onclick="copyGroupInviteLink('@g.InviteCode', '@g.GroupName')" 
+                                title="Скопировать ссылку-приглашение для студентов этой группы">
+                            <i class="bi bi-link-45deg"></i>
+                            <span>Инвайт-ссылка</span>
+                        </button>
+                        <form asp-action="DeleteGroup" asp-route-id="@g.GroupId" method="post" class="d-inline m-0 p-0" onsubmit="return confirm('Удалить группу @g.GroupName?');">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-sm btn-outline-danger shadow-none" title="Удалить учебную группу">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                        <span class="quiet-tag font-mono">Студентов: @g.Students.Count</span>
+                    </div>
+                </div>
+
+                <div class="list-group list-group-flush">
+                    @if (!g.Students.Any())
+                    {
+                        <div class="p-4 text-center text-muted small">
+                            <i class="bi bi-person-plus text-secondary me-1"></i> В группе пока нет студентов. Отправьте инвайт-ссылку для регистрации.
+                        </div>
+                    }
+                    @foreach (var s in g.Students)
+                    {
+                        <div class="list-group-item p-3">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <a href="javascript:void(0)" class="fw-bold text-decoration-none student-name-link" data-bs-toggle="modal" data-bs-target="#studentModal-@s.Id">
+                                            @s.FullName
+                                        </a>
+                                        <span class="badge @s.RadarBadgeClass" style="font-size: 0.72rem;">@s.RadarStatus</span>
+                                        @if (s.IsEmailConfirmed)
+                                        {
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle font-mono" style="font-size: 0.7rem;" title="Email подтвержден студентом">
+                                                <i class="bi bi-patch-check-fill me-1"></i>Подтвержден
+                                            </span>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle font-mono" style="font-size: 0.7rem;" title="Студент еще не подтвердил код из письма">
+                                                <i class="bi bi-clock-history me-1"></i>Ожидает подтверждения
+                                            </span>
+                                        }
+                                    </div>
+                                    <div class="text-muted small mt-1">
+                                        <code class="font-mono">@s.Username</code> • @(s.Email ?? "нет email")
+                                    </div>
+                                    <div class="d-flex gap-2 mt-2" style="font-size: 0.8rem;">
+                                        <span class="quiet-tag font-mono">
+                                            <i class="bi bi-book me-1"></i> @s.CompletedLecturesCount лекций
+                                        </span>
+                                        <span class="quiet-tag font-mono">
+                                            <i class="bi bi-check2-circle me-1"></i> @s.TestsPassedCount тестов
+                                        </span>
+                                        @if (s.AverageScorePercent.HasValue)
+                                        {
+                                            <span class="quiet-tag positive font-mono">
+                                                <i class="bi bi-star-fill me-1 text-warning"></i> @s.AverageScorePercent.Value%
+                                            </span>
+                                        }
+                                    </div>
+                                </div>
+
+                                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#studentModal-@s.Id">
+                                    <i class="bi bi-person-lines-fill me-1"></i> Досье
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Модальное окно досье студента (360° Profile) -->
+                        <div class="modal fade" id="studentModal-@s.Id" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-lg modal-dialog-centered">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <div>
+                                            <h5 class="modal-title fw-bold mb-0">
+                                                <i class="bi bi-person-badge text-primary me-2"></i>@s.FullName
+                                            </h5>
+                                            <div class="text-muted small">Группа @g.GroupName • Логин: <code>@s.Username</code></div>
+                                        </div>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body p-4">
+                                        <div class="row g-3 mb-4">
+                                            <div class="col-sm-4">
+                                                <div class="p-3 border rounded text-center">
+                                                    <div class="text-muted small mb-1">Освоено лекций</div>
+                                                    <div class="fs-3 fw-bold text-primary">@s.CompletedLecturesCount</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-sm-4">
+                                                <div class="p-3 border rounded text-center">
+                                                    <div class="text-muted small mb-1">Сдано тестов</div>
+                                                    <div class="fs-3 fw-bold text-success">@s.TestsPassedCount</div>
+                                                </div>
+                                            </div>
+                                            <div class="col-sm-4">
+                                                <div class="p-3 border rounded text-center">
+                                                    <div class="text-muted small mb-1">Средний балл</div>
+                                                    <div class="fs-3 fw-bold @(s.AverageScorePercent >= 70 ? "text-success" : "text-warning")">
+                                                        @(s.AverageScorePercent.HasValue ? s.AverageScorePercent.Value + "%" : "—")
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <h6 class="fw-bold mb-3"><i class="bi bi-clock-history me-1"></i>Последние попытки тестирования</h6>
+                                        @if (!s.RecentAttempts.Any())
+                                        {
+                                            <div class="text-muted small p-3 bg-light rounded text-center">Студент ещё не проходил тестирование.</div>
+                                        }
+                                        else
+                                        {
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover align-middle">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Тест / Лекция</th>
+                                                            <th class="text-center">Попытка</th>
+                                                            <th class="text-center">Результат</th>
+                                                            <th class="text-center">Статус</th>
+                                                            <th class="text-center">Дата</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        @foreach (var a in s.RecentAttempts)
+                                                        {
+                                                            <tr>
+                                                                <td>
+                                                                    <div class="fw-semibold">@a.TestTitle</div>
+                                                                    <div class="text-muted small">@a.LectureTitle</div>
+                                                                </td>
+                                                                <td class="text-center font-mono">#@a.AttemptNumber</td>
+                                                                <td class="text-center fw-bold @(a.ScorePercent >= 70 ? "text-success" : "text-danger")">
+                                                                    @a.ScorePercent%
+                                                                </td>
+                                                                <td class="text-center">
+                                                                    @if (a.IsPassed)
+                                                                    {
+                                                                        <span class="badge bg-success">Сдано</span>
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        <span class="badge bg-danger">Не сдано</span>
+                                                                    }
+                                                                </td>
+                                                                <td class="text-center text-muted small">
+                                                                    @(a.CompletedAt.HasValue ? a.CompletedAt.Value.ToString("dd.MM.yy HH:mm") : "—")
+                                                                </td>
+                                                            </tr>
+                                                        }
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        }
+
+                                        <hr class="my-3" />
+                                        <h6 class="fw-bold mb-3 d-flex align-items-center justify-content-between">
+                                            <span><i class="bi bi-shield-lock-fill text-primary me-2"></i>Безопасность и доступ студента</span>
+                                            @if (s.IsEmailConfirmed)
+                                            {
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle font-mono">
+                                                    <i class="bi bi-check-circle-fill me-1"></i>Почта подтверждена
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle font-mono">
+                                                    <i class="bi bi-exclamation-triangle-fill me-1"></i>Почта не подтверждена
+                                                </span>
+                                            }
+                                        </h6>
+
+                                        <div class="p-3 bg-body-tertiary rounded-3 border mb-3">
+                                            <div class="row g-2 align-items-center mb-3">
+                                                <div class="col-sm-6">
+                                                    <div class="text-muted small">Электронная почта:</div>
+                                                    <div class="fw-semibold font-mono">@(s.Email ?? "Не указана")</div>
+                                                </div>
+                                                <div class="col-sm-6 text-sm-end">
+                                                    @if (!s.IsEmailConfirmed)
+                                                    {
+                                                        <form asp-action="ConfirmStudentEmail" method="post" class="d-inline">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="studentId" value="@s.Id" />
+                                                            <button type="submit" class="btn btn-sm btn-outline-success">
+                                                                <i class="bi bi-check2-circle me-1"></i>Подтвердить Email вручную
+                                                            </button>
+                                                        </form>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-success small"><i class="bi bi-check-circle me-1"></i>Подтверждено</span>
+                                                    }
+                                                </div>
+                                            </div>
+
+                                            <form asp-action="ResetStudentPassword" method="post">
+                                                @Html.AntiForgeryToken()
+                                                <input type="hidden" name="studentId" value="@s.Id" />
+                                                <label class="form-label small fw-semibold">Сброс пароля студента:</label>
+                                                <div class="input-group input-group-sm">
+                                                    <span class="input-group-text"><i class="bi bi-key-fill"></i></span>
+                                                    <input type="text" name="newPassword" class="form-control font-mono" placeholder="Оставьте пустым для автогенерации (Edu123456!)" />
+                                                    <button type="submit" class="btn btn-warning" onclick="return confirm('Сбросить пароль для @s.FullName?');">
+                                                        <i class="bi bi-arrow-counterclockwise me-1"></i>Сбросить пароль
+                                                    </button>
+                                                </div>
+                                                <div class="form-text small text-muted">
+                                                    Преподаватель может установить студенту новый пароль или сгенерировать временный за 1 клик.
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <a asp-action="Reports" asp-route-groupId="@g.GroupId" class="btn btn-outline-primary btn-sm">
+                                            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Журнал группы
+                                        </a>
+                                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Закрыть</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Модальное окно создания группы (с выбором курса и срока обучения) -->
+<div class="modal fade" id="createGroupModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="CreateGroup" method="post" id="createGroupForm">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 34px; height: 34px; background: var(--primary-glow); color: var(--primary);">
+                            <i class="bi bi-people-fill"></i>
+                        </span>
+                        <div>
+                            <h5 class="modal-title fw-bold mb-0">Новая учебная группа</h5>
+                            <span class="text-muted small">Курсы 1–4, срок обучения 3–4 года</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- 1. Выбор курса (1..4) -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold d-flex justify-content-between">
+                            <span><i class="bi bi-mortarboard-fill text-primary me-1"></i>Курс обучения</span>
+                            <span class="text-muted small">1, 2, 3 или 4 курс</span>
+                        </label>
+                        <select name="courseNumber" id="newGroupCourse" class="form-select" onchange="onCourseChanged(this.value)" required>
+                            <option value="1" selected>1 курс (Группы 111, 112, 113, 114, 115...)</option>
+                            <option value="2">2 курс (Группы 211, 212, 213, 214, 215...)</option>
+                            <option value="3">3 курс (Группы 311, 312, 313, 314, 315...)</option>
+                            <option value="4">4 курс (Группы 411, 412, 413, 414, 415...)</option>
+                        </select>
+                    </div>
+
+                    <!-- 2. Срок обучения (3 или 4 года) -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">
+                            <i class="bi bi-clock-history text-primary me-1"></i>Сколько лет будут учиться
+                        </label>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="p-2 border rounded d-block text-center cursor-pointer duration-label h-100" style="background: var(--bg-surface);">
+                                    <input class="form-check-input me-1" type="radio" name="studyDurationYears" id="dur4" value="4" checked>
+                                    <span class="fw-semibold">4 года</span>
+                                    <span class="text-muted small d-block" style="font-size: 0.72rem;">на базе 9 классов</span>
+                                </label>
+                            </div>
+                            <div class="col-6">
+                                <label class="p-2 border rounded d-block text-center cursor-pointer duration-label h-100" style="background: var(--bg-surface);">
+                                    <input class="form-check-input me-1" type="radio" name="studyDurationYears" id="dur3" value="3">
+                                    <span class="fw-semibold">3 года</span>
+                                    <span class="text-muted small d-block" style="font-size: 0.72rem;">на базе 11 классов</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Номер группы (111, 112... 411) -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-hash text-primary me-1"></i>Номер группы</span>
+                            <span class="text-muted small" id="groupPrefixHint">Начинается с 1</span>
+                        </label>
+                        <input type="text" name="name" id="newGroupName" class="form-control font-mono fs-5 text-uppercase" placeholder="111" value="111" required oninput="updateInvitePreview(this.value)" />
+                        
+                        <div class="mt-2">
+                            <span class="small text-muted me-2">Быстрый выбор:</span>
+                            <span id="quickGroupButtons" class="d-inline-flex flex-wrap gap-1"></span>
+                        </div>
+                    </div>
+
+                    <!-- 4. Описание специальности -->
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Специальность / Профессия</label>
+                        <input type="text" name="description" class="form-control" placeholder="Например: Информационные системы и программирование" />
+                    </div>
+
+                    <!-- 5. Персональный инвайт-код -->
+                    <div class="mb-2">
+                        <label class="form-label small fw-semibold d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-key text-primary me-1"></i>Инвайт-код для студентов</span>
+                            <span class="quiet-tag font-mono small" id="invitePreviewBadge">Защищенный криптокод</span>
+                        </label>
+                        <input type="text" name="inviteCode" id="newGroupInvite" class="form-control font-mono text-uppercase" placeholder="Автоматически (стойкий криптокод, например: 111-K9X4M2)" />
+                        <div class="form-text small text-muted">Если оставить пустым, криптографически стойкий уникальный код сгенерируется автоматически.</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-1 shadow-sm">
+                        <i class="bi bi-plus-circle"></i> Создать группу
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function copyGroupInviteCode(code, groupName) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(code).then(() => {
+                    if (typeof showToast === 'function') {
+                        showToast(`Инвайт-код ${code} (Группа ${groupName}) скопирован!`, 'success');
+                    } else {
+                        alert(`Инвайт-код ${code} скопирован в буфер обмена`);
+                    }
+                }).catch(() => {
+                    prompt('Скопируйте инвайт-код:', code);
+                });
+            } else {
+                prompt('Скопируйте инвайт-код:', code);
+            }
+        }
+
+        function copyGroupInviteLink(code, groupName) {
+            const url = `${window.location.origin}/Account/Register?code=${encodeURIComponent(code)}`;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(url).then(() => {
+                    if (typeof showToast === 'function') {
+                        showToast(`Ссылка для группы ${groupName} скопирована!`, 'success');
+                    } else {
+                        alert(`Ссылка скопирована:\n${url}`);
+                    }
+                }).catch(() => {
+                    prompt('Скопируйте ссылку для регистрации студентов:', url);
+                });
+            } else {
+                prompt('Скопируйте ссылку для регистрации студентов:', url);
+            }
+        }
+
+        function setCourseFilter(course) {
+            document.querySelectorAll('.filter-pill-btn').forEach(b => {
+                b.classList.toggle('active', b.getAttribute('data-course-filter') === String(course));
+            });
+            let visibleCount = 0;
+            document.querySelectorAll('.group-card-col').forEach(col => {
+                const c = col.getAttribute('data-course');
+                if (course === 0 || c === String(course)) {
+                    col.style.display = '';
+                    visibleCount++;
+                } else {
+                    col.style.display = 'none';
+                }
+            });
+            const emptyNotice = document.getElementById('noGroupsNotice');
+            if (emptyNotice) {
+                emptyNotice.style.display = visibleCount === 0 ? '' : 'none';
+            }
+        }
+
+        function initModalCourse(course) {
+            const sel = document.getElementById('newGroupCourse');
+            if (sel) {
+                sel.value = String(course);
+                onCourseChanged(course);
+            }
+        }
+
+        function onCourseChanged(course) {
+            const hint = document.getElementById('groupPrefixHint');
+            if (hint) hint.textContent = `Начинается с цифры ${course}`;
+
+            const quickContainer = document.getElementById('quickGroupButtons');
+            if (quickContainer) {
+                quickContainer.innerHTML = '';
+                for (let i = 1; i <= 5; i++) {
+                    const num = `${course}1${i}`;
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'btn btn-sm btn-outline-secondary py-0 px-2 font-mono';
+                    btn.style.fontSize = '0.75rem';
+                    btn.textContent = num;
+                    btn.onclick = () => {
+                        const input = document.getElementById('newGroupName');
+                        input.value = num;
+                        updateInvitePreview(num);
+                    };
+                    quickContainer.appendChild(btn);
+                }
+            }
+
+            const input = document.getElementById('newGroupName');
+            if (input) {
+                const cur = input.value.trim();
+                if (!cur || /^[1-4]1[1-9]$/.test(cur)) {
+                    input.value = `${course}11`;
+                    updateInvitePreview(`${course}11`);
+                }
+            }
+        }
+
+        function updateInvitePreview(name) {
+            const clean = (name || '').trim().toUpperCase();
+            const badge = document.getElementById('invitePreviewBadge');
+            if (badge) {
+                badge.textContent = clean ? `${clean}-XXXXXX` : 'Случайный токен';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            onCourseChanged(1);
+        });
+    </script>
+}

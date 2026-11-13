@@ -1,0 +1,92 @@
+@model LoginViewModel
+@{
+    ViewData["Title"] = "Вход в TechHub";
+}
+
+<div class="row justify-content-center align-items-center py-4 g-4">
+    <div class="col-lg-5 col-md-7">
+        <div class="craft-card p-4 p-md-5">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <span class="brand-logo-wrapper" style="width: 44px; height: 44px;">
+                    <img src="~/images/logo-dark.jpg" class="brand-logo-img logo-theme-dark" alt="TechHub" style="width: 44px; height: 44px; border-radius: 10px;" />
+                    <img src="~/images/logo-light.jpg" class="brand-logo-img logo-theme-light" alt="TechHub" style="width: 44px; height: 44px; border-radius: 10px;" />
+                </span>
+                <div>
+                    <h4 class="mb-0 fw-bold">Вход в TechHub</h4>
+                    <span class="text-muted small">Образовательная платформа</span>
+                </div>
+            </div>
+
+            <form id="loginForm" asp-action="Login" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="ReturnUrl" />
+
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger p-2 small mb-3"></div>
+
+                <div class="mb-3">
+                    <label asp-for="Username" class="form-label">Логин или Email</label>
+                    <input asp-for="Username" id="loginUsername" class="form-control" placeholder="Введите ваш логин" autofocus required />
+                    <span asp-validation-for="Username" class="text-danger small"></span>
+                </div>
+
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label asp-for="Password" class="form-label mb-0">Пароль</label>
+                        <a asp-action="ForgotPassword" class="text-primary text-decoration-none small">
+                            <i class="bi bi-question-circle me-1"></i>Забыли пароль?
+                        </a>
+                    </div>
+                    <div class="input-group">
+                        <input asp-for="Password" id="loginPassword" type="password" class="form-control" placeholder="Введите пароль" required />
+                        <button type="button" class="btn btn-secondary" onclick="togglePasswordVisibility()" title="Показать/скрыть">
+                            <i class="bi bi-eye" id="togglePasswordIcon"></i>
+                        </button>
+                    </div>
+                    <span asp-validation-for="Password" class="text-danger small"></span>
+                </div>
+
+                <div class="mb-3 form-check">
+                    <input asp-for="RememberMe" class="form-check-input" />
+                    <label asp-for="RememberMe" class="form-check-label text-muted small">Запомнить меня на этом устройстве</label>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-box-arrow-in-right"></i>
+                    <span>Войти в кабинет</span>
+                </button>
+            </form>
+
+            <div class="text-center mt-4 pt-3 border-top text-muted small">
+                <div>
+                    <span>Студент без учетной записи?</span>
+                    <a asp-action="Register" class="ms-1 fw-semibold text-primary text-decoration-none">Регистрация по инвайт-коду</a>
+                </div>
+                <div class="mt-2">
+                    <span>Есть инвайт-ссылка преподавателя?</span>
+                    <a asp-action="RegisterStaff" class="ms-1 fw-semibold text-primary text-decoration-none">Активация инвайта</a>
+                </div>
+                <div class="mt-2">
+                    <span class="text-muted">Не подтвердили почту?</span>
+                    <a asp-action="VerifyEmail" class="ms-1 text-secondary text-decoration-underline">Ввести код подтверждения</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function togglePasswordVisibility() {
+            const passInput = document.getElementById('loginPassword');
+            const icon = document.getElementById('togglePasswordIcon');
+            if (passInput.type === 'password') {
+                passInput.type = 'text';
+                icon.className = 'bi bi-eye-slash';
+            } else {
+                passInput.type = 'password';
+                icon.className = 'bi bi-eye';
+            }
+        }
+    </script>
+    <partial name="_ValidationScriptsPartial" />
+}

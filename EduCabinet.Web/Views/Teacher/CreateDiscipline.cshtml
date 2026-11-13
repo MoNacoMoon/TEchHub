@@ -1,0 +1,87 @@
+@model DisciplineEditViewModel
+@{
+    ViewData["Title"] = "Создание дисциплины";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <div class="card shadow-sm border-0">
+            <div class="card-header py-3 border-bottom">
+                <h4 class="fw-bold mb-0 text-primary"><i class="bi bi-journal-plus me-2"></i>Новая учебная дисциплина</h4>
+            </div>
+            <div class="card-body p-4">
+                <form asp-action="CreateDiscipline" method="post">
+                    @Html.AntiForgeryToken()
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger p-2 small"></div>
+
+                    <div class="mb-3">
+                        <label asp-for="Title" class="form-label fw-semibold">Название дисциплины</label>
+                        <input asp-for="Title" class="form-control" placeholder="Например: Внедрение и поддержка компьютерных систем" autofocus required />
+                        <span asp-validation-for="Title" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Description" class="form-label fw-semibold">Описание дисциплины</label>
+                        <textarea asp-for="Description" class="form-control" rows="3" placeholder="Краткая аннотация и цели изучения дисциплины..."></textarea>
+                        <span asp-validation-for="Description" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-semibold">Закрепление за учебными группами (1–4 курсы)</label>
+                        <p class="text-muted small">Выберите группы студентов, которым будет открыт доступ к материалам курса:</p>
+                        
+                        @if (!Model.AvailableGroups.Any())
+                        {
+                            <div class="p-3 text-center text-muted border rounded small">
+                                Учебные группы ещё не созданы. Вы сможете закрепить группы позже через редактирование дисциплины.
+                            </div>
+                        }
+                        else
+                        {
+                            @for (int c = 1; c <= 4; c++)
+                            {
+                                var courseGroups = Model.AvailableGroups.Where(g => g.CourseNumber == c).ToList();
+                                if (courseGroups.Any())
+                                {
+                                    <div class="mb-3 p-3 rounded border" style="background: var(--bg-surface);">
+                                        <div class="d-flex align-items-center justify-content-between mb-2 pb-1 border-bottom">
+                                            <div class="fw-bold small text-primary">
+                                                <i class="bi bi-mortarboard-fill me-1"></i> @c курс
+                                            </div>
+                                            <span class="quiet-tag font-mono small">@courseGroups.Count групп</span>
+                                        </div>
+                                        <div class="row g-2">
+                                            @foreach (var g in courseGroups)
+                                            {
+                                                <div class="col-sm-6 col-md-4">
+                                                    <div class="form-check p-2 border rounded h-100">
+                                                        <input class="form-check-input ms-1 me-2" type="checkbox" name="SelectedGroupIds" value="@g.Id" id="grp_@g.Id" @(Model.SelectedGroupIds.Contains(g.Id) ? "checked" : "") />
+                                                        <label class="form-check-label fw-semibold" for="grp_@g.Id">
+                                                            Группа @g.Name 
+                                                            <span class="quiet-tag font-mono small ms-1">@g.StudyDurationYears г.</span>
+                                                            @if (!string.IsNullOrEmpty(g.Description))
+                                                            {
+                                                                <span class="text-muted small fw-normal d-block" style="font-size: 0.72rem;">@g.Description</span>
+                                                            }
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            }
+                                        </div>
+                                    </div>
+                                }
+                            }
+                        }
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center border-top pt-3">
+                        <a asp-action="Disciplines" class="btn btn-outline-secondary">Отмена</a>
+                        <button type="submit" class="btn btn-primary px-4 shadow-sm">
+                            <i class="bi bi-check2 me-1"></i> Создать дисциплину
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

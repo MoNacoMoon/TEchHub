@@ -1,0 +1,116 @@
+@model RegisterStaffViewModel
+@{
+    ViewData["Title"] = $"Регистрация: {Model.RoleNameRussian}";
+}
+
+<div class="row justify-content-center align-items-center py-4 g-4">
+    <div class="col-lg-6 col-xl-5">
+        <div class="craft-card p-4 p-md-5">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="brand-logo-wrapper">
+                        <img src="~/images/logo-dark.jpg" class="brand-logo-img logo-theme-dark" style="height: 38px; width: 38px;" alt="TechHub" />
+                        <img src="~/images/logo-light.jpg" class="brand-logo-img logo-theme-light" style="height: 38px; width: 38px;" alt="TechHub" />
+                    </span>
+                    <div>
+                        <h4 class="mb-0 fw-bold">Регистрация в TechHub</h4>
+                        <span class="text-muted small">Доступ: <strong class="text-primary">@Model.RoleNameRussian</strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <form asp-action="RegisterStaff" method="post" autocomplete="off">
+                @Html.AntiForgeryToken()
+
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger p-2 small mb-3"></div>
+
+                @if (Model.IsCodeLocked)
+                {
+                    <input type="hidden" asp-for="InviteCode" />
+                    <input type="hidden" asp-for="TargetRole" />
+                    <input type="hidden" asp-for="Note" />
+                    <input type="hidden" asp-for="IsCodeLocked" />
+
+                    <div class="p-3 mb-3 rounded-3" style="background: var(--primary-glow); border: 1px solid var(--border-focus);">
+                        <div class="d-flex align-items-center justify-content-between gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-shield-check text-success fs-3"></i>
+                                <div>
+                                    <div class="small text-muted">Уровень привилегий:</div>
+                                    <strong class="fs-5 text-primary">@Model.RoleNameRussian</strong>
+                                    @if (!string.IsNullOrEmpty(Model.Note))
+                                    {
+                                        <div class="small text-muted">@Model.Note</div>
+                                    }
+                                </div>
+                            </div>
+                            <span class="quiet-tag positive font-mono"><i class="bi bi-lock-fill me-1"></i>Инвайт подтвержден</span>
+                        </div>
+                        <div class="mt-2 pt-2 border-top border-secondary-subtle d-flex justify-content-between align-items-center">
+                            <span class="small font-mono text-muted">Код: @Model.InviteCode</span>
+                            <a asp-action="RegisterStaff" class="small text-decoration-none">Ввести другой</a>
+                        </div>
+                    </div>
+                }
+                else
+                {
+                    <div class="mb-3">
+                        <label asp-for="InviteCode" class="form-label d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-key-fill text-primary me-1"></i>Служебный инвайт-код</span>
+                            <span class="text-muted small">Выдается Администратором</span>
+                        </label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-qr-code"></i></span>
+                            <input asp-for="InviteCode" class="form-control font-mono text-uppercase" placeholder="Например: TEACH-TECHHUB-XXXXXX" required autocomplete="off" />
+                        </div>
+                        <span asp-validation-for="InviteCode" class="text-danger small"></span>
+                    </div>
+                }
+
+                <div class="mb-3">
+                    <label asp-for="FullName" class="form-label">ФИО полностью</label>
+                    <input asp-for="FullName" class="form-control" placeholder="Фамилия Имя Отчество" required />
+                    <span asp-validation-for="FullName" class="text-danger small"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Username" class="form-label">Логин (для входа в кабинет)</label>
+                    <input asp-for="Username" class="form-control" placeholder="Например: teacher_petrov" required />
+                    <span asp-validation-for="Username" class="text-danger small"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Email" class="form-label d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-envelope-at text-primary me-1"></i>Электронная почта (обязательно)</span>
+                        <span class="text-muted small">Для кода подтверждения</span>
+                    </label>
+                    <input asp-for="Email" type="email" class="form-control" placeholder="mail@example.com" required />
+                    <span asp-validation-for="Email" class="text-danger small"></span>
+                </div>
+
+                <div class="row g-2 mb-4">
+                    <div class="col-md-6">
+                        <label asp-for="Password" class="form-label">Пароль</label>
+                        <input asp-for="Password" type="password" class="form-control" placeholder="Не менее 6 знаков" required />
+                        <span asp-validation-for="Password" class="text-danger small"></span>
+                    </div>
+                    <div class="col-md-6">
+                        <label asp-for="ConfirmPassword" class="form-label">Подтверждение</label>
+                        <input asp-for="ConfirmPassword" type="password" class="form-control" placeholder="Повторите пароль" required />
+                        <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-shield-lock-fill"></i>
+                    <span>Зарегистрироваться как @Model.RoleNameRussian</span>
+                </button>
+            </form>
+
+            <div class="text-center mt-3 pt-3 border-top text-muted small">
+                <span>Уже есть учетная запись?</span>
+                <a asp-action="Login" class="ms-1 fw-semibold text-primary text-decoration-none">Войти в TechHub</a>
+            </div>
+        </div>
+    </div>
+</div>

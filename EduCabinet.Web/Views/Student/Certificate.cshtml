@@ -1,0 +1,365 @@
+@model EduCabinet.Web.Models.ViewModels.StudentCertificateViewModel
+@{
+    ViewData["Title"] = "Сертификат об окончании курса";
+}
+
+<style>
+    /* Стили экрана */
+    .cert-toolbar {
+        max-width: 960px;
+        margin: 0 auto 1.5rem auto;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .cert-wrapper {
+        max-width: 980px;
+        margin: 0 auto 3rem auto;
+        padding: 12px;
+        background: #f1f5f9;
+        border-radius: 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.12);
+    }
+
+    .cert-container {
+        position: relative;
+        background: #ffffff;
+        border: 4px solid #1e293b;
+        padding: 3rem 3.5rem;
+        box-shadow: inset 0 0 0 3px #c7d2fe, inset 0 0 0 7px #1e293b;
+        font-family: "Georgia", "Times New Roman", serif;
+        color: #0f172a;
+        text-align: center;
+        overflow: hidden;
+    }
+
+    /* Фоновый водяной знак */
+    .cert-watermark {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 28rem;
+        color: rgba(99, 102, 241, 0.035);
+        pointer-events: none;
+        z-index: 0;
+        font-family: sans-serif;
+    }
+
+    .cert-inner {
+        position: relative;
+        z-index: 1;
+    }
+
+    .cert-header {
+        text-transform: uppercase;
+        letter-spacing: 0.18em;
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #475569;
+        margin-bottom: 0.5rem;
+    }
+
+    .cert-subhead {
+        font-size: 0.8rem;
+        color: #64748b;
+        letter-spacing: 0.08em;
+        margin-bottom: 1.5rem;
+    }
+
+    .cert-title {
+        font-size: 2.3rem;
+        font-weight: 800;
+        letter-spacing: 0.06em;
+        color: #1e1b4b;
+        text-transform: uppercase;
+        margin-bottom: 0.2rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+    }
+
+    .cert-title::before, .cert-title::after {
+        content: "";
+        display: inline-block;
+        width: 60px;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #4338ca);
+    }
+    .cert-title::after {
+        background: linear-gradient(90deg, #4338ca, transparent);
+    }
+
+    .cert-presented {
+        font-style: italic;
+        font-size: 1.05rem;
+        color: #64748b;
+        margin: 1.2rem 0 0.8rem 0;
+    }
+
+    .cert-student-name {
+        font-size: 2.1rem;
+        font-weight: 700;
+        color: #312e81;
+        letter-spacing: 0.02em;
+        padding-bottom: 0.4rem;
+        border-bottom: 2px solid #818cf8;
+        display: inline-block;
+        min-width: 420px;
+        margin-bottom: 0.5rem;
+    }
+
+    .cert-student-group {
+        font-size: 0.95rem;
+        color: #475569;
+        font-family: sans-serif;
+        font-weight: 600;
+        margin-bottom: 1.5rem;
+    }
+
+    .cert-statement {
+        font-size: 1.12rem;
+        line-height: 1.7;
+        color: #1e293b;
+        max-width: 780px;
+        margin: 0 auto 1.5rem auto;
+    }
+
+    .cert-discipline {
+        font-weight: 700;
+        color: #1e1b4b;
+        display: block;
+        font-size: 1.35rem;
+        margin-top: 0.3rem;
+    }
+
+    .cert-badge-honor {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        color: #92400e;
+        border: 1px solid #f59e0b;
+        padding: 0.35rem 1rem;
+        border-radius: 9999px;
+        font-family: sans-serif;
+        font-size: 0.9rem;
+        font-weight: 700;
+        margin-bottom: 1.8rem;
+    }
+
+    .cert-topics-list {
+        font-family: sans-serif;
+        font-size: 0.8rem;
+        color: #475569;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.4rem;
+        max-width: 820px;
+        margin: 0 auto 2.2rem auto;
+    }
+
+    .cert-topic-tag {
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        padding: 0.2rem 0.6rem;
+        border-radius: 4px;
+    }
+
+    /* Подписи и печати */
+    .cert-footer-grid {
+        display: grid;
+        grid-template-columns: 1fr 140px 1fr;
+        align-items: center;
+        gap: 1.5rem;
+        margin-top: 2rem;
+        padding-top: 1.5rem;
+        border-top: 1px solid #e2e8f0;
+        font-family: sans-serif;
+    }
+
+    .cert-sign-block {
+        text-align: center;
+    }
+
+    .cert-sign-line {
+        border-bottom: 1px solid #0f172a;
+        margin: 2rem auto 0.4rem auto;
+        width: 190px;
+    }
+
+    .cert-sign-role {
+        font-size: 0.75rem;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .cert-sign-name {
+        font-weight: 700;
+        font-size: 0.9rem;
+        color: #0f172a;
+    }
+
+    .cert-seal {
+        width: 110px;
+        height: 110px;
+        margin: 0 auto;
+        border: 3px double #dc2626;
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        color: #dc2626;
+        transform: rotate(-8deg);
+        font-size: 0.65rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        line-height: 1.2;
+        padding: 4px;
+        box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2);
+    }
+
+    .cert-seal i {
+        font-size: 1.4rem;
+        margin-bottom: 2px;
+    }
+
+    .cert-meta {
+        margin-top: 1.5rem;
+        font-family: sans-serif;
+        font-size: 0.75rem;
+        color: #94a3b8;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    /* Печать на принтере и PDF */
+    @@media print {
+        body {
+            background: #ffffff !important;
+            color: #000000 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        .navbar, .footer, .cert-toolbar, .btn {
+            display: none !important;
+        }
+
+        .cert-wrapper {
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            max-width: 100% !important;
+            background: #ffffff !important;
+        }
+
+        .cert-container {
+            border: 4px solid #000000 !important;
+            box-shadow: inset 0 0 0 3px #6366f1, inset 0 0 0 6px #000000 !important;
+            page-break-inside: avoid;
+            padding: 2.5rem 3rem !important;
+        }
+
+        @@page {
+            size: A4 landscape;
+            margin: 1cm;
+        }
+    }
+</style>
+
+<div class="container-fluid px-3 py-4">
+    <div class="cert-toolbar">
+        <a asp-action="Discipline" asp-route-id="@Model.DisciplineId" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i> Вернуться к дисциплине
+        </a>
+        <div class="d-flex gap-2">
+            <button onclick="window.print()" class="btn btn-primary px-4 shadow-sm">
+                <i class="bi bi-printer-fill me-2"></i> Распечатать / Сохранить в PDF
+            </button>
+        </div>
+    </div>
+
+    <div class="cert-wrapper">
+        <div class="cert-container">
+            <div class="cert-watermark"><i class="bi bi-mortarboard"></i></div>
+            <div class="cert-inner">
+                <div class="cert-header">Электронный Учебный Кабинет Преподавателя и Студента</div>
+                <div class="cert-subhead">СИСТЕМА ДИСТАНЦИОННОГО И СМЕШАННОГО ОБУЧЕНИЯ • ГОСУДАРСТВЕННЫЙ СТАНДАРТ</div>
+
+                <div class="cert-title">
+                    <i class="bi bi-award-fill text-warning"></i>
+                    Сертификат
+                    <i class="bi bi-award-fill text-warning"></i>
+                </div>
+
+                <div class="cert-presented">Настоящим удостоверяется, что студент</div>
+                <div class="cert-student-name">@Model.StudentFullName</div>
+                <div class="cert-student-group">Учебная группа: @Model.GroupName</div>
+
+                <div class="cert-statement">
+                    успешно освоил(а) в полном объёме учебную программу курса
+                    <span class="cert-discipline">«@Model.DisciplineTitle»</span>
+                </div>
+
+                <div>
+                    <span class="cert-badge-honor">
+                        <i class="bi bi-star-fill"></i>
+                        Итоговая аттестация: @Model.AverageScorePercent% • @Model.GradeHonor
+                    </span>
+                </div>
+
+                @if (Model.TopicsCompleted.Any())
+                {
+                    <div class="cert-topics-list">
+                        <span class="fw-bold me-1">Освоенные модули:</span>
+                        @foreach (var topic in Model.TopicsCompleted)
+                        {
+                            <span class="cert-topic-tag"><i class="bi bi-check2 text-success me-1"></i>@topic</span>
+                        }
+                    </div>
+                }
+
+                <div class="cert-footer-grid">
+                    <div class="cert-sign-block">
+                        <div class="cert-sign-line"></div>
+                        <div class="cert-sign-name">@Model.TeacherFullName</div>
+                        <div class="cert-sign-role">Ведущий преподаватель курса</div>
+                    </div>
+
+                    <div class="cert-seal">
+                        <i class="bi bi-shield-check"></i>
+                        <span>ЭУК • ВЕРНО</span>
+                        <span style="font-size: 0.55rem;">РЕЕСТР 2026</span>
+                    </div>
+
+                    <div class="cert-sign-block">
+                        <div class="cert-sign-line"></div>
+                        <div class="cert-sign-name">Смирнов А.П.</div>
+                        <div class="cert-sign-role">Заведующий кафедрой</div>
+                    </div>
+                </div>
+
+                <div class="cert-meta">
+                    <div>
+                        <strong>Регистрационный номер:</strong> @Model.CertificateNumber
+                    </div>
+                    <div>
+                        <strong>Дата выдачи:</strong> @Model.IssueDate.ToString("dd MMMM yyyy г.")
+                    </div>
+                    <div>
+                        <i class="bi bi-qr-code me-1"></i> Подтверждено цифровой подписью
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

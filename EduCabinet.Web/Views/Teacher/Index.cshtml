@@ -1,0 +1,219 @@
+@model TeacherDashboardViewModel
+@{
+    ViewData["Title"] = "Панель преподавателя";
+    string teacherName = User.FindFirst("FullName")?.Value ?? "Преподаватель";
+}
+
+<!-- Заголовок панели преподавателя -->
+<div class="workspace-header">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h1 class="mb-1">Панель преподавателя</h1>
+            <div class="context-meta">
+                <span class="quiet-tag">Куратор дисциплин</span>
+                <span class="text-secondary"><i class="bi bi-person"></i> @teacherName</span>
+                <span class="font-mono text-muted">@(User.Identity?.Name ?? "teacher")</span>
+                <span class="text-muted"><i class="bi bi-calendar3"></i> Семестр @DateTime.Now.Year</span>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <a asp-action="CreateDiscipline" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Новая дисциплина
+            </a>
+            <a asp-action="Reports" class="btn btn-secondary">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Сводный журнал
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- 1. Метрики преподавателя -->
+<div class="stat-row">
+    <div class="stat-tile">
+        <div class="stat-label">Моих дисциплин</div>
+        <div class="stat-value">@Model.DisciplinesCount</div>
+        <div class="stat-sub">Активные учебные программы</div>
+    </div>
+    <div class="stat-tile">
+        <div class="stat-label">Всего лекций</div>
+        <div class="stat-value">@Model.LecturesCount</div>
+        <div class="stat-sub">С теоретическими конспектами</div>
+    </div>
+    <div class="stat-tile">
+        <div class="stat-label">Студентов на курсах</div>
+        <div class="stat-value">@Model.StudentsCount</div>
+        <div class="stat-sub">Закрепленный контингент</div>
+    </div>
+    <div class="stat-tile">
+        <div class="stat-label">Ожидают проверки</div>
+        <div class="stat-value @(Model.PendingReviewsCount > 0 ? "text-warning" : "")">@Model.PendingReviewsCount</div>
+        <div class="stat-sub">
+            @(Model.PendingReviewsCount > 0 ? "Развернутые ответы и эссе" : "Очередь чиста")
+        </div>
+    </div>
+</div>
+
+<!-- 2. Двухколоночный макет: Дисциплины + Панель инструментов -->
+<div class="row g-4 mb-4">
+    <!-- Левая колонка: Список дисциплин -->
+    <div class="col-lg-8">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h4 class="mb-0">Учебные дисциплины</h4>
+                <div class="text-muted small">Управление структурой, лекциями и аттестацией</div>
+            </div>
+            <div class="search-input-wrap">
+                <i class="bi bi-search search-input-icon"></i>
+                <input type="text" placeholder="Поиск курса..." oninput="searchDisciplines(this.value)">
+            </div>
+        </div>
+
+        <div class="d-grid gap-2" id="teacherDisciplinesList">
+            @if (!Model.Disciplines.Any())
+            {
+                <div class="craft-card p-4 text-center text-muted">
+                    <p class="mb-2">В системе пока нет закрепленных за вами дисциплин.</p>
+                    <a asp-action="CreateDiscipline" class="btn btn-primary btn-sm">
+                        Создать первую дисциплину
+                    </a>
+                </div>
+            }
+            @foreach (var d in Model.Disciplines)
+            {
+                <div class="craft-card p-3 discipline-item-card" data-title="@d.Title">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                        <div style="max-width: 440px;">
+                            <div class="d-flex align-items-center gap-2 mb-1">
+                                <span class="quiet-tag font-mono">ID @d.Id</span>
+                                <span class="quiet-tag font-mono">Студентов: @d.EnrolledStudentsCount</span>
+                            </div>
+                            <h5 class="mb-1">
+                                <a asp-action="DisciplineDetails" asp-route-id="@d.Id" class="text-reset">
+                                    @d.Title
+                                </a>
+                            </h5>
+                            <div class="text-muted font-mono" style="font-size: 0.76rem;">
+                                Модулей: @d.TopicsCount &bull; Лекций: @d.LecturesCount
+                            </div>
+                        </div>
+
+                        <div class="d-flex flex-wrap gap-1">
+                            <a asp-action="DisciplineDetails" asp-route-id="@d.Id" class="btn btn-secondary btn-sm">
+                                Содержание
+                            </a>
+                            <a asp-action="Reports" asp-route-disciplineId="@d.Id" class="btn btn-secondary btn-sm">
+                                Успеваемость
+                            </a>
+                            <a asp-action="EditDiscipline" asp-route-id="@d.Id" class="btn btn-secondary btn-sm" title="Настройки">
+                                <i class="bi bi-gear"></i>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Правая колонка: Проверка, Инструменты, Аудит -->
+    <div class="col-lg-4">
+        @if (Model.PendingReviewsCount > 0)
+        {
+            <div class="craft-card p-3 mb-3" style="border-left: 3px solid var(--warning) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="fw-semibold" style="font-size: 0.84rem;">Очередь проверки</span>
+                    <span class="quiet-tag warning font-mono">@Model.PendingReviewsCount работ</span>
+                </div>
+                <p class="text-muted small mb-3">
+                    Студенты ожидают ручной оценки ответов для продолжения обучения.
+                </p>
+                <a asp-action="ManualReviews" class="btn btn-primary btn-sm w-100">
+                    Перейти к проверке (@Model.PendingReviewsCount)
+                </a>
+            </div>
+        }
+
+        <!-- Быстрые инструменты -->
+        <div class="craft-card p-3 mb-3">
+            <span class="fw-semibold d-block mb-2" style="font-size: 0.84rem;">Инструменты управления</span>
+            <div class="d-grid gap-1">
+                <a asp-action="Reports" class="demo-account-row">
+                    <div>
+                        <div class="fw-medium" style="font-size: 0.82rem;">Сводный журнал и Excel</div>
+                        <div class="text-muted" style="font-size: 0.72rem;">Ведомости успеваемости групп</div>
+                    </div>
+                    <span class="text-muted font-mono" style="font-size: 0.72rem;">&rarr;</span>
+                </a>
+                <a asp-action="Students" class="demo-account-row">
+                    <div>
+                        <div class="fw-medium" style="font-size: 0.82rem;">Учебные группы и контингент</div>
+                        <div class="text-muted" style="font-size: 0.72rem;">Список студентов и темп обучения</div>
+                    </div>
+                    <span class="text-muted font-mono" style="font-size: 0.72rem;">&rarr;</span>
+                </a>
+                <a asp-action="Backup" class="demo-account-row">
+                    <div>
+                        <div class="fw-medium" style="font-size: 0.82rem;">Резервные копии БД</div>
+                        <div class="text-muted" style="font-size: 0.72rem;">Снапшоты SQLite и точка отката</div>
+                    </div>
+                    <span class="text-muted font-mono" style="font-size: 0.72rem;">&rarr;</span>
+                </a>
+                <a asp-action="AuditLog" class="demo-account-row">
+                    <div>
+                        <div class="fw-medium" style="font-size: 0.82rem;">Журнал безопасности</div>
+                        <div class="text-muted" style="font-size: 0.72rem;">Аудит входов, действий и попыток</div>
+                    </div>
+                    <span class="text-muted font-mono" style="font-size: 0.72rem;">&rarr;</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Недавний аудит -->
+        <div class="craft-card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-semibold" style="font-size: 0.84rem;">Журнал аудита</span>
+                <a asp-action="AuditLog" class="text-muted font-mono" style="font-size: 0.72rem;">Все события</a>
+            </div>
+
+            @if (!Model.RecentLogs.Any())
+            {
+                <div class="text-muted small py-2">Журнал событий пуст</div>
+            }
+            else
+            {
+                <div class="d-grid">
+                    @foreach (var log in Model.RecentLogs.Take(5))
+                    {
+                        <div class="quiet-list-item">
+                            <div style="min-width: 0;">
+                                <span class="quiet-tag font-mono" style="font-size: 0.65rem;">@log.Action</span>
+                                <div class="text-truncate text-secondary" style="font-size: 0.78rem; max-width: 170px;" title="@log.Description">
+                                    @log.Description
+                                </div>
+                            </div>
+                            <span class="text-muted font-mono" style="font-size: 0.7rem;">
+                                @log.Timestamp.ToLocalTime().ToString("HH:mm")
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function searchDisciplines(query) {
+            const q = (query || '').toLowerCase().trim();
+            const cards = document.querySelectorAll('.discipline-item-card');
+            cards.forEach(card => {
+                const title = (card.getAttribute('data-title') || '').toLowerCase();
+                if (!q || title.includes(q)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+    </script>
+}

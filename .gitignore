@@ -1,0 +1,35 @@
+## Visual Studio / .NET .gitignore
+.vs/
+[Bb]in/
+[Oo]bj/
+*.user
+*.userosscache
+*.suo
+*.userprefs
+*.tmp
+*.log
+publish/
+backups/
+
+# Базы данных и файлы блокировок
+*.db
+*.db-shm
+*.db-wal
+*.bak
+*.sqlite
+
+# Файлы окружения и секреты
+.env
+.env.*
+appsettings.local.json
+appsettings.*.local.json
+appsettings.Production.json
+secrets.json
+
+# Пользовательские загрузки в репозиторий
+wwwroot/uploads/*
+!wwwroot/uploads/.gitkeep
+
+# Вспомогательные папки агента
+scratch/
+.agents/

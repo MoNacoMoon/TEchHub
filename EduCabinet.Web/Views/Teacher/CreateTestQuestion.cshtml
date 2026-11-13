@@ -1,0 +1,153 @@
+@model QuestionCreateEditViewModel
+@{
+    var test = ViewBag.Test as Test;
+    ViewData["Title"] = "Добавление вопроса в тест";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header py-3 border-bottom">
+                <h4 class="fw-bold mb-0 text-primary"><i class="bi bi-patch-question me-2"></i>Новый вопрос теста</h4>
+                <div class="text-muted small">Тест: @test?.Title</div>
+            </div>
+            <div class="card-body p-4">
+                <form asp-action="CreateTestQuestion" asp-route-testId="@test?.Id" method="post">
+                    @Html.AntiForgeryToken()
+
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger p-2 small"></div>
+
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            <label asp-for="Type" class="form-label fw-semibold">Тип вопроса</label>
+                            <select asp-for="Type" class="form-select" id="testQTypeSelect" onchange="switchTestQType()">
+                                <option value="SingleChoice">Выбор одного правильного ответа</option>
+                                <option value="MultipleChoice">Выбор нескольких правильных ответов</option>
+                                <option value="ShortText">Краткий текстовый ответ</option>
+                                <option value="FillBlank">Ввод пропущенного слова/термина</option>
+                                <option value="Matching">На установление соответствия</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label asp-for="OrderIndex" class="form-label fw-semibold">Порядковый №</label>
+                            <input asp-for="OrderIndex" type="number" class="form-control" />
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Text" class="form-label fw-semibold">Текст вопроса теста</label>
+                        <textarea asp-for="Text" class="form-control" rows="3" placeholder="Введите текст вопроса..." autofocus></textarea>
+                        <span asp-validation-for="Text" class="text-danger small"></span>
+                    </div>
+
+                    <!-- Текстовый эталон -->
+                    <div id="blockTestText" class="p-3 bg-light rounded border mb-3" style="display: none;">
+                        <div class="mb-2">
+                            <label asp-for="CorrectTextAnswer" class="form-label small">Правильный ответ</label>
+                            <input asp-for="CorrectTextAnswer" class="form-control" />
+                        </div>
+                        <div>
+                            <label asp-for="SynonymsCsv" class="form-label small">Допустимые синонимы (через запятую)</label>
+                            <input asp-for="SynonymsCsv" class="form-control" />
+                        </div>
+                    </div>
+
+                    <!-- Варианты ответов -->
+                    <div id="blockTestOptions" class="p-3 bg-light rounded border mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold mb-0">Варианты ответов:</h6>
+                            <button type="button" class="btn btn-sm btn-outline-primary" onclick="addTestOptionRow()">
+                                <i class="bi bi-plus-circle me-1"></i> Добавить вариант
+                            </button>
+                        </div>
+
+                        <div id="testOptionsContainer">
+                            <div class="row g-2 mb-2 test-opt-row align-items-center">
+                                <div class="col-auto">
+                                    <input type="checkbox" name="Options[0].IsCorrect" value="true" class="form-check-input correct-test-cb" title="Правильный" />
+                                </div>
+                                <div class="col">
+                                    <input type="text" name="Options[0].Text" class="form-control form-control-sm" placeholder="Вариант 1" value="Вариант 1" />
+                                </div>
+                                <div class="col matching-test-col" style="display: none;">
+                                    <input type="text" name="Options[0].MatchingKey" class="form-control form-control-sm" placeholder="Соответствие (правая часть)" />
+                                </div>
+                            </div>
+                            <div class="row g-2 mb-2 test-opt-row align-items-center">
+                                <div class="col-auto">
+                                    <input type="checkbox" name="Options[1].IsCorrect" value="true" class="form-check-input correct-test-cb" title="Правильный" />
+                                </div>
+                                <div class="col">
+                                    <input type="text" name="Options[1].Text" class="form-control form-control-sm" placeholder="Вариант 2" value="Вариант 2" />
+                                </div>
+                                <div class="col matching-test-col" style="display: none;">
+                                    <input type="text" name="Options[1].MatchingKey" class="form-control form-control-sm" placeholder="Соответствие (правая часть)" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center border-top pt-3">
+                        <a asp-action="EditTest" asp-route-lectureId="@test?.LectureId" class="btn btn-outline-secondary">Отмена</a>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-check2 me-1"></i> Добавить вопрос
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        let testOptionIndex = 2;
+
+        function switchTestQType() {
+            const type = document.getElementById("testQTypeSelect").value;
+            const blockText = document.getElementById("blockTestText");
+            const blockOptions = document.getElementById("blockTestOptions");
+            const matchingCols = document.querySelectorAll(".matching-test-col");
+            const correctCbs = document.querySelectorAll(".correct-test-cb");
+
+            if (type === "ShortText" || type === "FillBlank") {
+                blockText.style.display = "block";
+                blockOptions.style.display = "none";
+            } else if (type === "Matching") {
+                blockText.style.display = "none";
+                blockOptions.style.display = "block";
+                matchingCols.forEach(c => c.style.display = "block");
+                correctCbs.forEach(cb => cb.parentElement.style.display = "none");
+            } else {
+                blockText.style.display = "none";
+                blockOptions.style.display = "block";
+                matchingCols.forEach(c => c.style.display = "none");
+                correctCbs.forEach(cb => cb.parentElement.style.display = "block");
+            }
+        }
+
+        function addTestOptionRow() {
+            const container = document.getElementById("testOptionsContainer");
+            const type = document.getElementById("testQTypeSelect").value;
+            const isMatching = type === "Matching";
+
+            const div = document.createElement("div");
+            div.className = "row g-2 mb-2 test-opt-row align-items-center";
+            div.innerHTML = `
+                <div class="col-auto" style="${isMatching ? 'display:none;' : ''}">
+                    <input type="checkbox" name="Options[${testOptionIndex}].IsCorrect" value="true" class="form-check-input correct-test-cb" />
+                </div>
+                <div class="col">
+                    <input type="text" name="Options[${testOptionIndex}].Text" class="form-control form-control-sm" placeholder="Вариант ${testOptionIndex + 1}" />
+                </div>
+                <div class="col matching-test-col" style="${isMatching ? 'display:block;' : 'display:none;'}">
+                    <input type="text" name="Options[${testOptionIndex}].MatchingKey" class="form-control form-control-sm" placeholder="Соответствие (правая часть)" />
+                </div>
+            `;
+            container.appendChild(div);
+            testOptionIndex++;
+        }
+
+        switchTestQType();
+    </script>
+}

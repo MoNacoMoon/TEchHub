@@ -1,0 +1,270 @@
+@model DisciplineStudyViewModel
+@{
+    ViewData["Title"] = Model.Title;
+
+    var allLecturesInOrder = Model.Topics
+        .OrderBy(t => t.OrderIndex)
+        .SelectMany(t => t.Lectures.OrderBy(l => l.OrderIndex))
+        .ToList();
+    int completedCount = allLecturesInOrder.Count(l => l.Status == LectureAccessStatus.Completed);
+    int totalCount = allLecturesInOrder.Count;
+    int lineFillPercent = totalCount > 1 
+        ? (int)Math.Round((double)completedCount / (totalCount - 1) * 100) 
+        : (completedCount > 0 ? 100 : 0);
+}
+
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-action="Index">Личный кабинет</a></li>
+        <li class="breadcrumb-item active" aria-current="page">@Model.Title</li>
+    </ol>
+</nav>
+
+<!-- 1. Hero-баннер дисциплины -->
+<div class="profile-hero-card mb-4">
+    <div class="profile-hero-content">
+        <div class="row align-items-center g-4">
+            <div class="col-lg-8">
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="profile-pill">
+                        <i class="bi bi-mortarboard-fill text-warning me-1"></i>Учебный курс
+                    </span>
+                    <span class="profile-pill">
+                        <i class="bi bi-clock-history me-1"></i>Последовательный допуск
+                    </span>
+                    @if (Model.ProgressPercent == 100)
+                    {
+                        <span class="profile-pill bg-success text-white fw-bold">
+                            <i class="bi bi-check-circle-fill me-1"></i>Курс освоен на 100%
+                        </span>
+                    }
+                </div>
+
+                <h2 class="display-6 fw-bold text-white mb-2">@Model.Title</h2>
+                <p class="text-light-subtle opacity-90 mb-3 fs-6" style="max-width: 680px;">@Model.Description</p>
+
+                <div class="d-flex flex-wrap gap-3 text-light-subtle small opacity-75">
+                    <span><i class="bi bi-folder me-1"></i>Модулей: <strong>@Model.Topics.Count</strong></span>
+                    <span><i class="bi bi-book me-1"></i>Всего лекций: <strong>@Model.TotalLectures</strong></span>
+                    <span><i class="bi bi-check2-circle me-1 text-success"></i>Изучено: <strong>@Model.CompletedLectures</strong></span>
+                </div>
+            </div>
+
+            <div class="col-lg-4 text-lg-end">
+                <div class="d-inline-block text-start p-3 rounded-4 shadow-sm" style="background: rgba(255, 255, 255, 0.12); backdrop-filter: blur(8px); min-width: 240px; border: 1px solid rgba(255, 255, 255, 0.2);">
+                    <div class="d-flex justify-content-between align-items-center text-white small fw-bold mb-2">
+                        <span>Прогресс курса:</span>
+                        <span class="fs-5 @(Model.ProgressPercent == 100 ? "text-success" : "text-warning")">@Model.ProgressPercent%</span>
+                    </div>
+                    <div class="progress mb-2" style="height: 10px; border-radius: 5px; background: rgba(255, 255, 255, 0.25);">
+                        <div class="progress-bar @(Model.ProgressPercent == 100 ? "bg-success" : "bg-warning")" role="progressbar" style="width: @Model.ProgressPercent%;" aria-valuenow="@Model.ProgressPercent" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <div class="d-flex justify-content-between text-white-50" style="font-size: 0.75rem;">
+                        <span>@Model.CompletedLectures из @Model.TotalLectures лекций</span>
+                        <span>@(Model.ProgressPercent == 100 ? "Завершено" : "В процессе")</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (Model.IsCertificateAvailable)
+{
+    <div class="card border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(99, 102, 241, 0.05)); border-left: 5px solid #4338ca !important;">
+        <div class="card-body p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div>
+                <span class="badge bg-success mb-2 px-3 py-2"><i class="bi bi-award-fill me-1"></i>Курс успешно освоен на 100%</span>
+                <h4 class="fw-bold mb-1 text-body">Поздравляем с окончанием дисциплины!</h4>
+                <p class="text-secondary mb-0 small">Все лекции и контрольные тесты пройдены. Вам сформирован официальный академический сертификат с гербовой печатью и QR-кодом валидации.</p>
+            </div>
+            <a asp-action="Certificate" asp-route-disciplineId="@Model.DisciplineId" class="btn btn-primary btn-lg shadow-sm text-nowrap px-4">
+                <i class="bi bi-mortarboard-fill me-2"></i>Получить сертификат
+            </a>
+        </div>
+    </div>
+}
+
+@if (Model.Announcements.Any())
+{
+    <div class="card shadow-sm border-0 mb-4" style="border-left: 4px solid #0284c7 !important;">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="fw-bold mb-0 text-body">
+                <i class="bi bi-megaphone-fill text-info me-2"></i>Объявления преподавателя курса
+            </h6>
+            <span class="badge bg-info-subtle text-info border">@Model.Announcements.Count сообщений</span>
+        </div>
+        <div class="card-body p-0">
+            <div class="list-group list-group-flush">
+                @foreach (var ann in Model.Announcements)
+                {
+                    <div class="list-group-item p-3 @(ann.IsPinned ? "bg-light-subtle" : "")">
+                        <div class="d-flex w-100 justify-content-between align-items-center mb-1">
+                            <h6 class="fw-bold mb-0 text-body">
+                                @if (ann.IsPinned)
+                                {
+                                    <span class="badge bg-warning text-dark me-1"><i class="bi bi-pin-angle-fill me-1"></i>Закреплено</span>
+                                }
+                                @ann.Title
+                            </h6>
+                            <small class="text-muted"><i class="bi bi-clock me-1"></i>@ann.CreatedAt.ToString("dd.MM.yyyy HH:mm")</small>
+                        </div>
+                        <p class="mb-1 text-secondary" style="font-size: 0.925rem;">@ann.Content</p>
+                        <small class="text-muted"><i class="bi bi-person-badge me-1"></i>Преподаватель: @ann.TeacherName</small>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+}
+
+@if (allLecturesInOrder.Any())
+{
+    <div class="roadmap-wrapper">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div>
+                <h5 class="fw-bold mb-0 text-body"><i class="bi bi-bezier2 text-primary me-2"></i>Интерактивная карта прохождения курса</h5>
+                <span class="text-muted small">Последовательный образовательный маршрут студента</span>
+            </div>
+            <span class="badge bg-primary-subtle text-primary border">Шаг @(Math.Min(completedCount + 1, totalCount)) из @totalCount</span>
+        </div>
+
+        <div class="roadmap-container">
+            <div class="roadmap-line">
+                <div class="roadmap-line-fill" style="width: @Math.Min(100, lineFillPercent)%;"></div>
+            </div>
+
+            @for (int i = 0; i < allLecturesInOrder.Count; i++)
+            {
+                var lec = allLecturesInOrder[i];
+                string circleClass = lec.Status == LectureAccessStatus.Completed ? "completed" 
+                    : (lec.Status == LectureAccessStatus.Available ? "available" : "locked");
+                string iconClass = lec.Status == LectureAccessStatus.Completed ? "bi-check-lg" 
+                    : (lec.Status == LectureAccessStatus.Available ? "bi-play-fill" : "bi-lock-fill");
+
+                <a href="@(lec.Status != LectureAccessStatus.Locked ? Url.Action("Lecture", new { id = lec.Id }) : "#")" 
+                   class="roadmap-node @(lec.Status == LectureAccessStatus.Locked ? "pe-none opacity-75" : "")"
+                   title="@lec.Title (@(lec.Status == LectureAccessStatus.Completed ? "Изучено" : (lec.Status == LectureAccessStatus.Available ? "Доступно сейчас" : "Заблокировано")))">
+                    <div class="roadmap-circle @circleClass">
+                        <i class="bi @iconClass"></i>
+                    </div>
+                    <div class="roadmap-label text-truncate" style="max-width: 120px;">
+                        @(i + 1). @lec.Title
+                    </div>
+                    <div class="roadmap-sub">
+                        @(lec.Status == LectureAccessStatus.Completed ? "Изучено" : (lec.Status == LectureAccessStatus.Available ? "Текущая" : "Замок"))
+                    </div>
+                </a>
+            }
+        </div>
+    </div>
+}
+
+<div class="alert alert-light border shadow-sm mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-shield-check text-primary fs-3"></i>
+        <div class="small">
+            <strong>Правило последовательного обучения:</strong> Каждая следующая лекция становится доступной только после выполнения контрольных заданий и успешной сдачи итогового теста предыдущей лекции (не менее установленного проходного балла).
+        </div>
+    </div>
+</div>
+
+@if (!Model.Topics.Any())
+{
+    <div class="alert alert-warning">
+        В данной дисциплине пока нет тем.
+    </div>
+}
+else
+{
+    @foreach (var topic in Model.Topics.OrderBy(t => t.OrderIndex))
+    {
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header py-3 border-bottom">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0 text-primary">
+                        <i class="bi bi-folder2-open me-2"></i>@topic.Title
+                    </h5>
+                    <span class="badge bg-light text-muted border">Лекций: @topic.Lectures.Count</span>
+                </div>
+                @if (!string.IsNullOrEmpty(topic.Description))
+                {
+                    <p class="text-muted small mb-0 mt-1">@topic.Description</p>
+                }
+            </div>
+
+            <div class="list-group list-group-flush">
+                @foreach (var lec in topic.Lectures.OrderBy(l => l.OrderIndex))
+                {
+                    <div class="list-group-item p-3 @(lec.Status == LectureAccessStatus.Locked ? "bg-light opacity-75" : "")">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                            <div class="d-flex align-items-center gap-3">
+                                @if (lec.Status == LectureAccessStatus.Completed)
+                                {
+                                    <span class="badge bg-success p-2 rounded-circle" title="Лекция успешно изучена"><i class="bi bi-check-lg fs-6"></i></span>
+                                }
+                                else if (lec.Status == LectureAccessStatus.Available)
+                                {
+                                    <span class="badge bg-primary p-2 rounded-circle" title="Лекция доступна для изучения"><i class="bi bi-unlock-fill fs-6"></i></span>
+                                }
+                                else
+                                {
+                                    <span class="badge bg-secondary p-2 rounded-circle" title="Лекция заблокирована"><i class="bi bi-lock-fill fs-6"></i></span>
+                                }
+
+                                <div>
+                                    <h6 class="fw-bold mb-1 text-body">
+                                        @lec.Title
+                                        @if (lec.IsManuallyUnlocked)
+                                        {
+                                            <span class="badge bg-warning text-dark small ms-1" title="Открыта преподавателем вручную"><i class="bi bi-key-fill me-1"></i>Открыта вручную</span>
+                                        }
+                                    </h6>
+                                    <div class="d-flex flex-wrap gap-2 text-muted small">
+                                        @if (lec.HasAttachment)
+                                        {
+                                            <span><i class="bi bi-paperclip me-1"></i>Есть конспект (PDF)</span>
+                                        }
+                                        @if (lec.HasControlQuestions)
+                                        {
+                                            <span><i class="bi bi-question-circle me-1"></i>Контрольные вопросы</span>
+                                        }
+                                        @if (lec.HasTest)
+                                        {
+                                            <span><i class="bi bi-patch-check me-1"></i>Итоговый тест</span>
+                                        }
+                                        @if (lec.BestTestScore.HasValue)
+                                        {
+                                            <span class="badge bg-info-subtle text-info border">Тест: @lec.BestTestScore%</span>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                @if (lec.Status == LectureAccessStatus.Completed)
+                                {
+                                    <a asp-action="Lecture" asp-route-id="@lec.Id" class="btn btn-outline-success btn-sm">
+                                        <i class="bi bi-check2-circle me-1"></i> Повторить
+                                    </a>
+                                }
+                                else if (lec.Status == LectureAccessStatus.Available)
+                                {
+                                    <a asp-action="Lecture" asp-route-id="@lec.Id" class="btn btn-primary btn-sm">
+                                        <i class="bi bi-box-arrow-in-right me-1"></i> Изучить лекцию
+                                    </a>
+                                }
+                                else
+                                {
+                                    <button class="btn btn-outline-secondary btn-sm" disabled title="Сначала завершите изучение предыдущей лекции">
+                                        <i class="bi bi-lock me-1"></i> Заблокировано
+                                    </button>
+                                }
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+}

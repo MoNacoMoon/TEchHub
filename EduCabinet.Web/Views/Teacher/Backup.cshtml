@@ -1,0 +1,84 @@
+@{
+    ViewData["Title"] = "Резервное копирование и восстановление";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+            <div>
+                <h2 class="fw-bold mb-1">Резервное копирование и восстановление</h2>
+                <p class="text-muted mb-0">Обеспечение сохранности учебных данных, конспектов, тестов и результатов студентов</p>
+            </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <!-- 1. Создание резервной копии -->
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header py-3 border-bottom">
+                        <h5 class="fw-bold mb-0 text-primary">
+                            <i class="bi bi-cloud-arrow-down-fill me-2"></i>Создание резервной копии
+                        </h5>
+                    </div>
+                    <div class="card-body p-4 d-flex flex-column">
+                        <p class="text-muted small flex-grow-1">
+                            Резервная копия позволяет сохранить полное состояние системы (всех пользователей, дисциплины, загруженные материалы, тесты и попытки студентов) на внешний носитель.
+                        </p>
+
+                        <div class="d-grid gap-2">
+                            <a asp-action="DownloadDatabaseBackup" class="btn btn-outline-primary">
+                                <i class="bi bi-database-down me-1"></i> Скачать базу данных (.db)
+                            </a>
+                            <a asp-action="DownloadFullBackup" class="btn btn-primary">
+                                <i class="bi bi-file-zip-fill me-1"></i> Скачать полный архив системы (.zip)
+                            </a>
+                        </div>
+                        <div class="form-text small mt-2 text-muted">
+                            Полный архив включает базу SQLite и каталог загруженных файлов лекций.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Восстановление из копии -->
+            <div class="col-md-6">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header py-3 border-bottom">
+                        <h5 class="fw-bold mb-0 text-danger">
+                            <i class="bi bi-cloud-arrow-up-fill me-2"></i>Восстановление из копии
+                        </h5>
+                    </div>
+                    <div class="card-body p-4">
+                        <p class="text-muted small">
+                            Загрузите ранее созданный файл резервной копии (<strong>.db</strong> или <strong>.zip</strong>). Перед восстановлением система автоматически создаст снимок текущей базы данных.
+                        </p>
+
+                        <form asp-action="RestoreDatabase" method="post" enctype="multipart/form-data" onsubmit="return confirm('Внимание! Текущие данные будут заменены данными из выбранной резервной копии. Продолжить?')">
+                            @Html.AntiForgeryToken()
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold">Файл резервной копии:</label>
+                                <input type="file" name="backupFile" class="form-control form-control-sm" accept=".db,.zip" required />
+                            </div>
+
+                            <button type="submit" class="btn btn-danger w-100">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i> Восстановить систему
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Регламент и рекомендации по сопровождению -->
+        <div class="card shadow-sm border-0 bg-light border">
+            <div class="card-body p-4">
+                <h6 class="fw-bold mb-2 text-body"><i class="bi bi-shield-shaded text-primary me-2"></i>Регламент сопровождения и резервного копирования:</h6>
+                <ul class="small text-muted mb-0">
+                    <li><strong>Периодичность:</strong> рекомендуется выгружать резервную копию раз в неделю, а также обязательно перед каждым обновлением ПО или проведением итоговой аттестации.</li>
+                    <li><strong>Хранение:</strong> копии должны храниться на отдельном защищенном накопителе (внешний SSD/флеш-диск или сетевое хранилище).</li>
+                    <li><strong>Безопасность:</strong> файл базы данных содержит хешированные пароли и результаты студентов, доступ к файлу должен быть ограничен только преподавателем.</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,76 @@
+@model List<ManualReviewItemViewModel>
+@{
+    ViewData["Title"] = "Проверка развернутых ответов";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+        <h2 class="fw-bold mb-1">Проверка развернутых ответов</h2>
+        <p class="text-muted mb-0">Ответы студентов на открытые контрольные вопросы, требующие экспертной оценки преподавателя</p>
+    </div>
+    <span class="badge bg-warning text-dark fs-6 px-3 py-2">
+        Ожидают проверки: @Model.Count
+    </span>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="card shadow-sm border-0 p-5 text-center text-muted">
+        <i class="bi bi-check-all fs-1 text-success mb-2"></i>
+        <h5>Все ответы проверены!</h5>
+        <p class="small mb-0">На данный момент нет новых ответов студентов, ожидающих ручной проверки.</p>
+    </div>
+}
+else
+{
+    <div class="d-grid gap-4">
+        @foreach (var item in Model)
+        {
+            <div class="card shadow-sm border-0 border-start border-warning border-4">
+                <div class="card-header py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
+                    <div>
+                        <span class="badge bg-primary me-2">@item.GroupName</span>
+                        <strong class="fs-6">@item.StudentFullName</strong>
+                        <span class="text-muted small ms-2">Лекция: <em>«@item.LectureTitle»</em></span>
+                    </div>
+                    <div class="text-muted small">
+                        <i class="bi bi-clock me-1"></i>Отправлено: @item.SubmittedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                    </div>
+                </div>
+
+                <div class="card-body p-4">
+                    <div class="mb-3">
+                        <h6 class="fw-bold text-muted small text-uppercase">Формулировка вопроса:</h6>
+                        <div class="p-3 bg-light rounded border">
+                            @item.QuestionText
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <h6 class="fw-bold text-muted small text-uppercase">Ответ студента:</h6>
+                        <div class="p-3 bg-surface rounded border border-primary-subtle text-body fs-6 lh-base" style="white-space: pre-wrap;">@item.StudentAnswer</div>
+                    </div>
+
+                    <form asp-action="GradeAnswer" method="post" class="bg-light p-3 rounded border">
+                        @Html.AntiForgeryToken()
+                        <input type="hidden" name="AnswerId" value="@item.AnswerId" />
+
+                        <div class="mb-3">
+                            <label class="form-label small fw-semibold">Рецензия / комментарий преподавателя:</label>
+                            <input type="text" name="TeacherComment" class="form-control form-control-sm" placeholder="Например: Ответ раскрыт полностью, пример верный." />
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" name="IsCorrect" value="true" class="btn btn-success btn-sm px-3 fw-semibold">
+                                <i class="bi bi-check-lg me-1"></i> Зачесть ответ
+                            </button>
+                            <button type="submit" name="IsCorrect" value="false" class="btn btn-outline-danger btn-sm px-3">
+                                <i class="bi bi-x-lg me-1"></i> Отправить на доработку
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        }
+    </div>
+}

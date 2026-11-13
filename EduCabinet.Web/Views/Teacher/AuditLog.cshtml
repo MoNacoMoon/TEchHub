@@ -1,0 +1,73 @@
+@model List<EventLog>
+@{
+    ViewData["Title"] = "Журнал аудита действий";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+        <h2 class="fw-bold mb-1">Журнал событий и аудита</h2>
+        <p class="text-muted mb-0">История значимых действий преподавателя и студентов: ручные разблокировки, сброс попыток, загрузка файлов, сдача тестов</p>
+    </div>
+    <span class="badge bg-secondary fs-6 px-3 py-2">Записей: @Model.Count</span>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="table-responsive">
+        <table class="table table-hover table-striped align-middle mb-0 small">
+            <thead class="table-dark">
+                <tr>
+                    <th style="width: 140px;">Дата и время</th>
+                    <th style="width: 130px;">Действие</th>
+                    <th>Описание события</th>
+                    <th style="width: 150px;">Целевой студент</th>
+                    <th style="width: 150px;">Лекция</th>
+                    <th style="width: 110px;">IP-адрес</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">Журнал событий пуст.</td>
+                    </tr>
+                }
+                @foreach (var log in Model)
+                {
+                    <tr>
+                        <td class="text-nowrap text-muted">@log.Timestamp.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")</td>
+                        <td>
+                            @if (log.Action == "MANUAL_UNLOCK")
+                            {
+                                <span class="badge bg-warning text-dark"><i class="bi bi-key-fill me-1"></i>Разблокировка</span>
+                            }
+                            else if (log.Action == "GRADE_ANSWER")
+                            {
+                                <span class="badge bg-success"><i class="bi bi-check2-circle me-1"></i>Оценка</span>
+                            }
+                            else if (log.Action == "RESET_ATTEMPTS")
+                            {
+                                <span class="badge bg-danger"><i class="bi bi-arrow-counterclockwise me-1"></i>Сброс</span>
+                            }
+                            else if (log.Action == "TEST_SUBMITTED")
+                            {
+                                <span class="badge bg-info text-dark"><i class="bi bi-card-checklist me-1"></i>Тест сдан</span>
+                            }
+                            else if (log.Action == "UPDATE_MATERIAL")
+                            {
+                                <span class="badge bg-primary"><i class="bi bi-file-earmark-arrow-up me-1"></i>Файл</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-light text-body border">@log.Action</span>
+                            }
+                        </td>
+                        <td>@log.Description</td>
+                        <td>@(log.TargetStudent ?? "-")</td>
+                        <td>@(log.TargetLecture ?? "-")</td>
+                        <td><code>@(log.IpAddress ?? "local")</code></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>

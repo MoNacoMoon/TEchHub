@@ -1,0 +1,221 @@
+@model List<EduCabinet.Web.Models.Entities.SystemInviteToken>
+@{
+    ViewData["Title"] = "Инвайт-ссылки преподавателей";
+    var hostUrl = $"{Context.Request.Scheme}://{Context.Request.Host}";
+}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 38px; height: 38px; background: var(--primary-glow); color: var(--primary); font-size: 1.2rem;">
+                <i class="bi bi-person-badge-fill"></i>
+            </span>
+            <h3 class="fw-bold mb-0">Инвайт-ссылки для преподавателей</h3>
+        </div>
+        <p class="text-muted small mb-0">
+            Управление персональными приглашениями для преподавателей. Регистрация по ссылке сразу присваивает статус преподавателя.
+        </p>
+    </div>
+
+    <div>
+        <button class="btn btn-primary d-inline-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#createInviteModal">
+            <i class="bi bi-plus-circle-fill"></i>
+            <span>Создать инвайт для преподавателя</span>
+        </button>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-sm-6 col-lg-3">
+        <div class="craft-card p-3 text-center">
+            <div class="text-muted small mb-1">Всего инвайтов</div>
+            <div class="fs-3 fw-bold text-primary font-mono">@Model.Count</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="craft-card p-3 text-center">
+            <div class="text-muted small mb-1">Активные (ожидают регистрации)</div>
+            <div class="fs-3 fw-bold text-success font-mono">@Model.Count(t => !t.IsUsed)</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="craft-card p-3 text-center">
+            <div class="text-muted small mb-1">Использованные инвайты</div>
+            <div class="fs-3 fw-bold text-secondary font-mono">@Model.Count(t => t.IsUsed)</div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="craft-card p-3 text-center">
+            <div class="text-muted small mb-1">Зарегистрировано преподавателей</div>
+            <div class="fs-3 fw-bold text-primary font-mono">@Model.Count(t => t.IsUsed && t.TargetRole == EduCabinet.Web.Models.Entities.UserRole.Teacher)</div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-transparent py-3 border-bottom d-flex align-items-center justify-content-between">
+        <h5 class="fw-bold mb-0 text-primary">
+            <i class="bi bi-key-fill me-2"></i>Реестр служебных инвайтов
+        </h5>
+        <span class="quiet-tag font-mono">TechHub System</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Инвайт-код</th>
+                    <th>Роль доступа</th>
+                    <th>Примечание</th>
+                    <th>Статус</th>
+                    <th>Создан</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (!Model.Any())
+                {
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="bi bi-envelope-paper fs-2 d-block mb-2 text-secondary"></i>
+                            Инвайт-ссылок пока нет. Нажмите «Создать инвайт для преподавателя», чтобы сгенерировать первую ссылку.
+                        </td>
+                    </tr>
+                }
+                @foreach (var inv in Model)
+                {
+                    var fullLink = $"{hostUrl}/Account/RegisterStaff?code={inv.Token}";
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <code class="font-mono fw-bold fs-6 px-2 py-1 bg-body-tertiary rounded border">
+                                    @inv.Token
+                                </code>
+                                <button type="button" class="btn btn-sm btn-outline-secondary p-1" onclick="copyText('@inv.Token', 'Инвайт-код скопирован!')" title="Скопировать только код">
+                                    <i class="bi bi-clipboard"></i>
+                                </button>
+                            </div>
+                        </td>
+                        <td>
+                            @if (inv.TargetRole == EduCabinet.Web.Models.Entities.UserRole.Admin)
+                            {
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle font-mono">
+                                    <i class="bi bi-shield-lock-fill me-1"></i>Администратор
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-mono">
+                                    <i class="bi bi-person-workspace me-1"></i>Преподаватель
+                                </span>
+                            }
+                        </td>
+                        <td>
+                            <span class="text-muted small">@(inv.Note ?? "—")</span>
+                        </td>
+                        <td>
+                            @if (inv.IsUsed)
+                            {
+                                <div>
+                                    <span class="badge bg-secondary-subtle text-secondary font-mono">
+                                        <i class="bi bi-check2-all me-1"></i>Использован
+                                    </span>
+                                    @if (inv.UsedByUser != null)
+                                    {
+                                        <div class="small fw-semibold mt-1">@inv.UsedByUser.FullName (<code>@inv.UsedByUser.Username</code>)</div>
+                                    }
+                                    @if (inv.UsedAt.HasValue)
+                                    {
+                                        <div class="text-muted" style="font-size: 0.75rem;">@inv.UsedAt.Value.ToString("dd.MM.yyyy HH:mm")</div>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                <span class="badge bg-success-subtle text-success border border-success-subtle font-mono">
+                                    <i class="bi bi-hourglass-split me-1"></i>Активен (готов к регистрации)
+                                </span>
+                            }
+                        </td>
+                        <td class="text-muted small">
+                            @inv.CreatedAt.ToString("dd.MM.yyyy HH:mm")
+                        </td>
+                        <td>
+                            <div class="d-flex gap-2">
+                                @if (!inv.IsUsed)
+                                {
+                                    <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1" onclick="copyText('@fullLink', 'Ссылка-приглашение для преподавателя скопирована!')" title="Скопировать готовую ссылку для преподавателя">
+                                        <i class="bi bi-link-45deg"></i>
+                                        <span>Скопировать ссылку</span>
+                                    </button>
+                                }
+                                <form asp-action="DeleteStaffInvite" method="post" class="d-inline m-0 p-0" onsubmit="return confirm('Удалить инвайт @inv.Token?');">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="id" value="@inv.Id" />
+                                    <button type="submit" class="btn btn-sm btn-outline-danger shadow-none" title="Удалить">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Модальное окно создания инвайта преподавателя -->
+<div class="modal fade" id="createInviteModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="CreateTeacherInvite" method="post">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 34px; height: 34px; background: var(--primary-glow); color: var(--primary);">
+                            <i class="bi bi-person-plus-fill"></i>
+                        </span>
+                        <div>
+                            <h5 class="modal-title fw-bold mb-0">Новый инвайт для преподавателя</h5>
+                            <span class="text-muted small">TechHub • Доступ уровня Teacher</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Примечание (для кого выдается инвайт):</label>
+                        <input type="text" name="note" class="form-control" placeholder="Например: Преподаватель информатики (Иванов И.И.)" />
+                        <div class="form-text small text-muted">
+                            Позволит вам в реестре легко определить, какому педагогу была отправлена эта ссылка.
+                        </div>
+                    </div>
+
+                    <div class="p-3 bg-body-tertiary rounded-3 border small text-muted">
+                        <i class="bi bi-info-circle text-primary me-1"></i>
+                        После создания система сформирует уникальный код вида <code class="font-mono">TEACH-TECHHUB-XXXXXX</code> и прямую ссылку для регистрации.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-check-circle-fill me-1"></i> Сгенерировать инвайт
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function copyText(text, successMsg) {
+            navigator.clipboard.writeText(text).then(function() {
+                alert(successMsg || 'Скопировано в буфер обмена!');
+            }).catch(function() {
+                prompt('Скопируйте вручную:', text);
+            });
+        }
+    </script>
+}

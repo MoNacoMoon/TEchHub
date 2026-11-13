@@ -1,0 +1,352 @@
+@model StudentDashboardViewModel
+@{
+    ViewData["Title"] = "Личный кабинет студента";
+}
+
+<!-- Заголовок рабочего пространства -->
+<div class="workspace-header">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h1 class="mb-1">Учебный кабинет студента</h1>
+            <div class="context-meta">
+                <span class="quiet-tag">Группа @Model.GroupName</span>
+                <span class="text-secondary"><i class="bi bi-person"></i> @Model.StudentFullName</span>
+                <span class="font-mono text-muted">@Model.StudentUsername</span>
+                <span class="text-muted"><i class="bi bi-calendar3"></i> Семестр @DateTime.Now.Year</span>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <span class="quiet-tag font-mono">Рейтинг: #@Model.GroupRank из @Model.GroupTotalStudents</span>
+            @if (Model.OverallProgressPercent == 100)
+            {
+                <span class="quiet-tag positive font-mono">100% Завершено</span>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- 1. Фокусный блок: Текущее учебное занятие (Hero Moment) -->
+@if (Model.SpotlightLecture != null)
+{
+    <div class="active-task-card">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+            <div>
+                <span class="quiet-tag mb-2 d-inline-block">
+                    Текущая задача • Лекция @Model.SpotlightLecture.LectureOrderIndex
+                </span>
+                <div class="text-muted small">@Model.SpotlightLecture.DisciplineTitle</div>
+                <h3 class="mb-2">@Model.SpotlightLecture.LectureTitle</h3>
+            </div>
+            <a asp-action="Lecture" asp-route-id="@Model.SpotlightLecture.LectureId" class="btn btn-primary">
+                Продолжить изучение &rarr;
+            </a>
+        </div>
+
+        <div class="d-flex justify-content-between text-muted" style="font-size: 0.78rem;">
+            <span>Прогресс дисциплины</span>
+            <span class="font-mono">@Model.SpotlightLecture.DisciplineProgressPercent%</span>
+        </div>
+        <div class="quiet-progress">
+            <div class="quiet-progress-fill" style="width: @Model.SpotlightLecture.DisciplineProgressPercent%;"></div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="craft-card p-3 mb-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <span class="quiet-tag positive mb-1 d-inline-block">Учебная программа завершена</span>
+                <h4 class="mb-1">Все дисциплины успешно освоены</h4>
+                <div class="text-muted small">Теоретический курс изучен, тесты сданы. Доступны именные академические сертификаты.</div>
+            </div>
+            @if (Model.Disciplines.Any())
+            {
+                <a asp-action="Certificate" asp-route-disciplineId="@Model.Disciplines.First().Id" class="btn btn-secondary">
+                    <i class="bi bi-award"></i> Открыть сертификат
+                </a>
+            }
+        </div>
+    </div>
+}
+
+<!-- 2. Строгие метрики студента (Stat Tiles) -->
+<div class="stat-row">
+    <div class="stat-tile">
+        <div class="stat-label">Пройдено лекций</div>
+        <div class="stat-value">@Model.TotalCompletedLectures <span class="text-muted fw-normal" style="font-size: 0.85rem;">/ @Model.TotalLectures</span></div>
+        <div class="stat-sub">Теоретический материал</div>
+    </div>
+    <div class="stat-tile">
+        <div class="stat-label">Общий прогресс</div>
+        <div class="stat-value">@Model.OverallProgressPercent%</div>
+        <div class="stat-sub">По всем дисциплинам</div>
+    </div>
+    <div class="stat-tile">
+        <div class="stat-label">Средний балл</div>
+        <div class="stat-value">@(Model.AverageTestScore.HasValue ? $"{Model.AverageTestScore}%" : "—")</div>
+        <div class="stat-sub">Контрольные тестирования</div>
+    </div>
+    <div class="stat-tile">
+        <div class="stat-label">Сдано тестов</div>
+        <div class="stat-value">@Model.TestsPassedCount</div>
+        <div class="stat-sub">Успешные попытки</div>
+    </div>
+</div>
+
+<!-- 3. Двухколоночный макет: Дисциплины + Боковая панель активности -->
+<div class="row g-4 mb-4">
+    <!-- Левая колонка: Учебные дисциплины -->
+    <div class="col-lg-8">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+                <h4 class="mb-0">Учебные дисциплины</h4>
+                <div class="text-muted small">Закрепленные курсы вашей группы</div>
+            </div>
+            <div class="search-input-wrap">
+                <i class="bi bi-search search-input-icon"></i>
+                <input type="text" placeholder="Поиск по курсам..." oninput="searchDisciplines(this.value)">
+            </div>
+        </div>
+
+        <!-- Фильтры -->
+        <div class="filter-bar">
+            <div class="filter-pills" id="disciplineFilterGroup">
+                <button type="button" class="filter-pill-btn active" onclick="filterDisciplines('all', this)">
+                    Все курсы (@Model.Disciplines.Count)
+                </button>
+                <button type="button" class="filter-pill-btn" onclick="filterDisciplines('in-progress', this)">
+                    В процессе (@Model.Disciplines.Count(d => d.ProgressPercent < 100))
+                </button>
+                <button type="button" class="filter-pill-btn" onclick="filterDisciplines('completed', this)">
+                    Завершенные (@Model.Disciplines.Count(d => d.ProgressPercent == 100))
+                </button>
+            </div>
+        </div>
+
+        @if (!Model.Disciplines.Any())
+        {
+            <div class="craft-card p-4 text-center text-muted">
+                <p class="mb-0">Для вашей учебной группы пока нет назначенных дисциплин.</p>
+            </div>
+        }
+        else
+        {
+            <div class="row g-3" id="disciplinesContainer">
+                @foreach (var d in Model.Disciplines)
+                {
+                    <div class="col-md-6 discipline-item-card" data-title="@d.Title" data-desc="@d.Description" data-completed="@(d.ProgressPercent == 100 ? "true" : "false")">
+                        <div class="course-card">
+                            <div class="course-meta-pills">
+                                <span class="quiet-tag">@d.TotalLectures лекций</span>
+                                @if (d.ProgressPercent == 100)
+                                {
+                                    <span class="quiet-tag positive">Освоен</span>
+                                }
+                                else
+                                {
+                                    <span class="quiet-tag">@d.CompletedLectures / @d.TotalLectures</span>
+                                }
+                            </div>
+
+                            <h5 class="mb-1">@d.Title</h5>
+                            <p class="text-secondary small flex-grow-1 mb-2">@d.Description</p>
+
+                            <div class="d-flex justify-content-between text-muted font-mono" style="font-size: 0.74rem;">
+                                <span>Прогресс</span>
+                                <span>@d.ProgressPercent%</span>
+                            </div>
+                            <div class="quiet-progress">
+                                <div class="quiet-progress-fill @(d.ProgressPercent == 100 ? "completed" : "")" style="width: @d.ProgressPercent%;"></div>
+                            </div>
+
+                            <div class="d-grid gap-1 mt-3">
+                                @if (d.NextAvailableLectureId.HasValue)
+                                {
+                                    <a asp-action="Lecture" asp-route-id="@d.NextAvailableLectureId.Value" class="btn btn-primary btn-sm">
+                                        Продолжить: @d.NextAvailableLectureTitle
+                                    </a>
+                                }
+                                else if (d.CompletedLectures == d.TotalLectures && d.TotalLectures > 0)
+                                {
+                                    <a asp-action="Certificate" asp-route-disciplineId="@d.Id" class="btn btn-secondary btn-sm">
+                                        <i class="bi bi-award"></i> Именной сертификат
+                                    </a>
+                                }
+                                <a asp-action="Discipline" asp-route-id="@d.Id" class="btn btn-secondary btn-sm">
+                                    Программа и материалы
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    <!-- Правая колонка: Календарь активности, Недавние тесты, Сертификаты -->
+    <div class="col-lg-4">
+        <!-- Календарь недели (7 дней активности) -->
+        <div class="craft-card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-semibold" style="font-size: 0.84rem;">Активность за 7 дней</span>
+                <span class="quiet-tag font-mono">@Model.LearningStreakDays дн. подряд</span>
+            </div>
+            <div class="text-muted small mb-2">График прохождения лекций и контрольных тестов</div>
+
+            <div class="activity-strip">
+                @foreach (var day in Model.WeeklyActivity)
+                {
+                    <div class="activity-day-unit">
+                        <span class="day-label @(day.IsToday ? "fw-bold text-primary" : "")">@day.DayName</span>
+                        <div class="day-dot @(day.IsActive ? "active" : "") @(day.IsToday ? "today" : "")" title="@day.DayName: @(day.IsActive ? "Занятие выполнено" : "Нет активности")">
+                            @if (day.IsActive)
+                            {
+                                <i class="bi bi-check"></i>
+                            }
+                            else if (day.IsToday)
+                            {
+                                <span>&bull;</span>
+                            }
+                            else
+                            {
+                                <span>-</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Недавняя активность (тесты) -->
+        <div class="craft-card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="fw-semibold" style="font-size: 0.84rem;">История тестирования</span>
+                <span class="quiet-tag font-mono">Попытки</span>
+            </div>
+
+            @if (!Model.RecentAttempts.Any())
+            {
+                <div class="text-muted small py-2">
+                    Тестирования еще не проводились. Перейдите к лекции для начала.
+                </div>
+            }
+            else
+            {
+                <div class="d-grid">
+                    @foreach (var attempt in Model.RecentAttempts)
+                    {
+                        <div class="quiet-list-item">
+                            <div>
+                                <div class="fw-medium text-truncate" style="max-width: 170px;" title="@attempt.TestTitle">
+                                    @attempt.TestTitle
+                                </div>
+                                <div class="text-muted font-mono" style="font-size: 0.72rem;">
+                                    @attempt.CompletedAt.ToString("dd.MM HH:mm")
+                                </div>
+                            </div>
+                            <span class="quiet-tag font-mono @(attempt.IsPassed ? "positive" : "warning")">
+                                @attempt.ScorePercent%
+                            </span>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
+        <!-- Академический сертификат -->
+        <div class="craft-card p-3">
+            <span class="fw-semibold d-block mb-1" style="font-size: 0.84rem;">Академический сертификат</span>
+            <p class="text-muted small mb-3">
+                Выдается после 100% прохождения теоретических материалов дисциплины и сдачи итогового тестирования.
+            </p>
+
+            @{
+                var completedDisc = Model.Disciplines.FirstOrDefault(d => d.CompletedLectures == d.TotalLectures && d.TotalLectures > 0);
+            }
+
+            @if (completedDisc != null)
+            {
+                <a asp-action="Certificate" asp-route-disciplineId="@completedDisc.Id" class="btn btn-primary btn-sm w-100">
+                    <i class="bi bi-award"></i> Посмотреть сертификат
+                </a>
+            }
+            else
+            {
+                <button type="button" class="btn btn-secondary btn-sm w-100" disabled>
+                    Курс еще не завершен
+                </button>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- 4. Достижения студента -->
+<div class="craft-card p-3 mb-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+            <h5 class="mb-0">Достижения и этапы обучения</h5>
+            <div class="text-muted small">Открываются по мере освоения учебных дисциплин и сдачи тестов</div>
+        </div>
+        <span class="quiet-tag font-mono">
+            Открыто @Model.Achievements.Count(a => a.IsUnlocked) из @Model.Achievements.Count
+        </span>
+    </div>
+
+    <div class="row g-2">
+        @foreach (var ach in Model.Achievements)
+        {
+            <div class="col-md-6 col-lg-4">
+                <div class="craft-card p-2 h-100 d-flex align-items-center gap-2" style="background-color: var(--bg-raised) !important;">
+                    <div class="brand-icon-box" style="background-color: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--hairline);">
+                        <i class="bi @ach.Icon"></i>
+                    </div>
+                    <div class="flex-grow-1" style="min-width: 0;">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="fw-semibold text-truncate" style="font-size: 0.82rem;">@ach.Title</span>
+                            <span class="quiet-tag font-mono @(ach.IsUnlocked ? "positive" : "")" style="font-size: 0.65rem;">
+                                @(ach.IsUnlocked ? "Получено" : "В процессе")
+                            </span>
+                        </div>
+                        <div class="text-muted text-truncate" style="font-size: 0.72rem;">@ach.Description</div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function filterDisciplines(category, btn) {
+            document.querySelectorAll('#disciplineFilterGroup .filter-pill-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const cards = document.querySelectorAll('.discipline-item-card');
+            cards.forEach(card => {
+                const isCompleted = card.getAttribute('data-completed') === 'true';
+                if (category === 'all') {
+                    card.style.display = '';
+                } else if (category === 'completed') {
+                    card.style.display = isCompleted ? '' : 'none';
+                } else if (category === 'in-progress') {
+                    card.style.display = !isCompleted ? '' : 'none';
+                }
+            });
+        }
+
+        function searchDisciplines(query) {
+            const q = (query || '').toLowerCase().trim();
+            const cards = document.querySelectorAll('.discipline-item-card');
+            cards.forEach(card => {
+                const title = (card.getAttribute('data-title') || '').toLowerCase();
+                const desc = (card.getAttribute('data-desc') || '').toLowerCase();
+                if (!q || title.includes(q) || desc.includes(q)) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+    </script>
+}

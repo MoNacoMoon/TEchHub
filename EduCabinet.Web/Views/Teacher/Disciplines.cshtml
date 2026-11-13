@@ -1,0 +1,100 @@
+@model List<Discipline>
+@{
+    ViewData["Title"] = "Управление дисциплинами";
+}
+
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+    <div>
+        <h2 class="fw-bold mb-1 text-body">Учебные дисциплины</h2>
+        <p class="text-muted mb-0">Управление структурой модулей, лекционным фондом и закреплением групп</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a asp-action="Reports" class="btn btn-outline-primary">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Сводный журнал
+        </a>
+        <a asp-action="CreateDiscipline" class="btn btn-primary shadow-sm">
+            <i class="bi bi-plus-circle me-1"></i> Добавить дисциплину
+        </a>
+    </div>
+</div>
+
+<div class="row g-4">
+    @if (!Model.Any())
+    {
+        <div class="col-12">
+            <div class="card p-5 text-center text-muted border-dashed">
+                <i class="bi bi-journal-x fs-1 text-secondary mb-2"></i>
+                <h5>Дисциплины еще не созданы</h5>
+                <p class="small">Нажмите «Добавить дисциплину», чтобы разработать первый курс.</p>
+                <div>
+                    <a asp-action="CreateDiscipline" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-circle me-1"></i> Создать дисциплину
+                    </a>
+                </div>
+            </div>
+        </div>
+    }
+    @foreach (var d in Model)
+    {
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm border-0 d-flex flex-column lecture-card">
+                <div class="card-body p-4 flex-grow-1">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                            <i class="bi bi-folder me-1"></i>Модулей: @d.Topics.Count
+                        </span>
+                        <div class="dropdown">
+                            <button class="btn btn-sm btn-light border-0 rounded-circle" type="button" data-bs-toggle="dropdown" title="Действия">
+                                <i class="bi bi-three-dots-vertical"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                                <li><a class="dropdown-item" asp-action="DisciplineDetails" asp-route-id="@d.Id"><i class="bi bi-folder2-open me-2 text-primary"></i>Содержание курса</a></li>
+                                <li><a class="dropdown-item" asp-action="EditDiscipline" asp-route-id="@d.Id"><i class="bi bi-pencil me-2 text-warning"></i>Редактировать</a></li>
+                                <li><a class="dropdown-item" asp-action="Reports" asp-route-disciplineId="@d.Id"><i class="bi bi-bar-chart-line me-2 text-success"></i>Ведомость успеваемости</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <form asp-action="DeleteDiscipline" asp-route-id="@d.Id" method="post" onsubmit="return confirm('Удалить дисциплину со всеми темами, лекциями и тестами?')">
+                                        @Html.AntiForgeryToken()
+                                        <button type="submit" class="dropdown-item text-danger"><i class="bi bi-trash me-2"></i>Удалить дисциплину</button>
+                                    </form>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <h5 class="card-title fw-bold text-body mb-2">
+                        <a asp-action="DisciplineDetails" asp-route-id="@d.Id" class="text-decoration-none text-body">
+                            @d.Title
+                        </a>
+                    </h5>
+                    <p class="card-text text-secondary small mb-3">@d.Description</p>
+
+                    <div class="small text-muted mb-3">
+                        <div class="fw-semibold mb-1 text-body"><i class="bi bi-people me-1"></i>Закрепленные группы:</div>
+                        @if (d.DisciplineGroups.Any())
+                        {
+                            <div class="d-flex flex-wrap gap-1">
+                                @foreach (var dg in d.DisciplineGroups)
+                                {
+                                    <span class="badge bg-secondary">@dg.Group.Name</span>
+                                }
+                            </div>
+                        }
+                        else
+                        {
+                            <span class="badge bg-success-subtle text-success">Доступно всем группам</span>
+                        }
+                    </div>
+                </div>
+
+                <div class="card-footer bg-transparent border-top p-3">
+                    <div class="d-grid gap-2">
+                        <a asp-action="DisciplineDetails" asp-route-id="@d.Id" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-folder2-open me-1"></i> Структура тем и лекций
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>

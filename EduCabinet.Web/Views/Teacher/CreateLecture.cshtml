@@ -1,0 +1,75 @@
+@model LectureEditViewModel
+@{
+    ViewData["Title"] = "Создание лекции";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <div class="card shadow-sm border-0">
+            <div class="card-header py-3 border-bottom">
+                <h4 class="fw-bold mb-0 text-primary"><i class="bi bi-file-earmark-plus me-2"></i>Новая лекция</h4>
+                <div class="text-muted small">Тема: @Model.TopicTitle</div>
+            </div>
+            <div class="card-body p-4">
+                <form asp-action="CreateLecture" method="post" enctype="multipart/form-data">
+                    @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="TopicId" />
+                    <input type="hidden" asp-for="TopicTitle" />
+                    <input type="hidden" asp-for="DisciplineId" />
+
+                    <div asp-validation-summary="ModelOnly" class="alert alert-danger p-2 small"></div>
+
+                    <div class="row">
+                        <div class="col-md-9 mb-3">
+                            <label asp-for="Title" class="form-label fw-semibold">Название лекции</label>
+                            <input asp-for="Title" class="form-control" placeholder="Например: Лекция 1. Основы тестирования ПО" autofocus />
+                            <span asp-validation-for="Title" class="text-danger small"></span>
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label asp-for="OrderIndex" class="form-label fw-semibold">Порядковый №</label>
+                            <input asp-for="OrderIndex" type="number" class="form-control" />
+                            <span asp-validation-for="OrderIndex" class="text-danger small"></span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Description" class="form-label fw-semibold">Краткое описание / аннотация</label>
+                        <textarea asp-for="Description" class="form-control" rows="2" placeholder="Краткое описание лекции для студента..."></textarea>
+                        <span asp-validation-for="Description" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label asp-for="AttachmentFile" class="form-label fw-semibold">
+                            <i class="bi bi-paperclip me-1 text-primary"></i>Файл конспекта лекции (PDF, DOCX)
+                        </label>
+                        <input asp-for="AttachmentFile" type="file" class="form-control" accept=".pdf,.doc,.docx" />
+                        <div class="form-text small">Студент сможет просматривать и скачивать данный документ при изучении темы.</div>
+                        <span asp-validation-for="AttachmentFile" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-4">
+                        <label asp-for="ContentHtml" class="form-label fw-semibold">Теоретический материал (HTML разметка или форматированный текст)</label>
+                        <textarea asp-for="ContentHtml" class="form-control font-monospace" rows="12" placeholder="<h3>1. Введение...</h3><p>Текст лекции...</p>"></textarea>
+                        <div class="form-text small">Поддерживается стандартный HTML: заголовки &lt;h3&gt;, списки &lt;ul&gt;, таблицы &lt;table&gt;, блоки внимания &lt;div class='alert alert-info'&gt;.</div>
+                        <span asp-validation-for="ContentHtml" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-4 form-check bg-light p-3 rounded border">
+                        <input asp-for="RequiresManualReview" class="form-check-input ms-1 me-2" />
+                        <label asp-for="RequiresManualReview" class="form-check-label fw-semibold">
+                            Требовать ручную проверку развёрнутых ответов до открытия следующей лекции
+                        </label>
+                        <div class="text-muted small ps-4">Если отмечено, то при наличии в лекции вопросов с развернутым ответом (эссе), следующая лекция откроется студенту только после того, как вы лично проверите ответ и поставите «Зачтено».</div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center border-top pt-3">
+                        <a asp-action="DisciplineDetails" asp-route-id="@Model.DisciplineId" class="btn btn-outline-secondary">Отмена</a>
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-check2 me-1"></i> Создать лекцию
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

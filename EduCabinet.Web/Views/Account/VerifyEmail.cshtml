@@ -1,0 +1,82 @@
+@model VerifyEmailViewModel
+@{
+    ViewData["Title"] = "Подтверждение почты";
+}
+
+<div class="row justify-content-center align-items-center py-4 g-4">
+    <div class="col-lg-5 col-md-7">
+        <div class="craft-card p-4 p-md-5">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <span class="brand-logo-wrapper" style="width: 44px; height: 44px;">
+                    <img src="~/images/logo-dark.jpg" class="brand-logo-img logo-theme-dark" alt="TechHub" style="width: 44px; height: 44px; border-radius: 10px;" />
+                    <img src="~/images/logo-light.jpg" class="brand-logo-img logo-theme-light" alt="TechHub" style="width: 44px; height: 44px; border-radius: 10px;" />
+                </span>
+                <div>
+                    <h4 class="mb-0 fw-bold">Подтверждение почты</h4>
+                    <span class="text-muted small">Образовательная платформа TechHub</span>
+                </div>
+            </div>
+
+            <p class="text-muted small mb-3">
+                На адрес <strong class="text-body font-mono">@Model.Email</strong> отправлен 6-значный код подтверждения. Введите его ниже для завершения регистрации в TechHub.
+            </p>
+
+            @if (!string.IsNullOrEmpty(Model.DevHintCode))
+            {
+                <div class="alert alert-info py-2 px-3 small mb-3 d-flex align-items-center justify-content-between">
+                    <div>
+                        <i class="bi bi-info-circle me-1"></i>
+                        <span>Код для тестирования (Dev-режим):</span>
+                    </div>
+                    <code class="fs-6 fw-bold px-2 py-1 bg-white text-dark rounded border font-mono">@Model.DevHintCode</code>
+                </div>
+            }
+
+            <form asp-action="VerifyEmail" method="post">
+                @Html.AntiForgeryToken()
+                <input type="hidden" asp-for="Email" />
+                <input type="hidden" asp-for="DevHintCode" />
+
+                <div asp-validation-summary="ModelOnly" class="alert alert-danger p-2 small mb-3"></div>
+
+                <div class="mb-4">
+                    <label asp-for="Code" class="form-label d-flex justify-content-between">
+                        <span class="fw-semibold">Код подтверждения (6 цифр)</span>
+                        <span class="text-muted small">Действует 15 минут</span>
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bi bi-shield-lock"></i></span>
+                        <input asp-for="Code" 
+                               class="form-control text-center font-mono fw-bold fs-4" 
+                               maxlength="6" 
+                               placeholder="123456" 
+                               inputmode="numeric" 
+                               pattern="[0-9]{6}" 
+                               style="letter-spacing: 6px;"
+                               autofocus 
+                               required />
+                    </div>
+                    <span asp-validation-for="Code" class="text-danger small"></span>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2 mb-3">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Подтвердить и войти</span>
+                </button>
+            </form>
+
+            <form asp-action="ResendConfirmationCode" method="post" class="mb-3">
+                @Html.AntiForgeryToken()
+                <input type="hidden" name="email" value="@Model.Email" />
+                <button type="submit" class="btn btn-outline-secondary btn-sm w-100">
+                    <i class="bi bi-arrow-repeat me-1"></i> Отправить код повторно
+                </button>
+            </form>
+
+            <div class="text-center pt-3 border-top text-muted small">
+                <span>Уже подтвердили или хотите сменить пользователя?</span>
+                <a asp-action="Login" class="ms-1 fw-semibold text-primary text-decoration-none">Вернуться ко входу</a>
+            </div>
+        </div>
+    </div>
+</div>
