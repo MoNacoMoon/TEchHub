@@ -62,35 +62,47 @@ public static class DbInitializer
         }
         catch { }
 
-        // Мастер-инвайты для первичной регистрации Администратора системы TechHub
-        var masterCodes = new[] { "ADMIN-TECHHUB-2026-M8W2", "ADMIN-TECHHUB-2026-X7K9" };
+        // Создание главного Администратора системы TechHub (DilaAdmin)
+        var hasher = new PasswordHasher<User>();
+        var adminUser = await context.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == "dilaadmin");
 
-        // Если в системе еще нет подтвержденного администратора — очищаем старые/незавершенные регистрации
-        var hasConfirmedAdmin = await context.Users.AnyAsync(u => u.Role == UserRole.Admin && u.IsEmailConfirmed);
-        if (!hasConfirmedAdmin)
+        // Если почта была привязана к другому старому пользователю — освобождаем её
+        var emailClash = await context.Users.FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == "cilondiom@gmail.com" && u.Username.ToLower() != "dilaadmin");
+        if (emailClash != null)
         {
-            var oldUsers = await context.Users.ToListAsync();
-            if (oldUsers.Any())
-            {
-                context.Users.RemoveRange(oldUsers);
-                await context.SaveChangesAsync();
-            }
-
-            try
-            {
-                await context.Database.ExecuteSqlRawAsync(@"
-                    DELETE FROM ""TestAttemptAnswers"";
-                    DELETE FROM ""TestAttempts"";
-                    DELETE FROM ""StudentControlAnswers"";
-                    DELETE FROM ""LectureProgresses"";
-                    DELETE FROM ""GroupMemberships"";
-                    DELETE FROM ""CourseAnnouncements"";
-                    DELETE FROM ""EventLogs"";
-                ");
-            }
-            catch { }
+            emailClash.Email = $"old_{emailClash.Id}@techhub.local";
+            await context.SaveChangesAsync();
         }
 
+        if (adminUser == null)
+        {
+            adminUser = new User
+            {
+                Username = "DilaAdmin",
+                FullName = "Администратор TechHub",
+                Email = "cilondiom@gmail.com",
+                Role = UserRole.Admin,
+                IsActive = true,
+                IsEmailConfirmed = true,
+                CreatedAt = DateTime.UtcNow
+            };
+            adminUser.PasswordHash = hasher.HashPassword(adminUser, "Moon_GGWW52");
+            context.Users.Add(adminUser);
+            await context.SaveChangesAsync();
+        }
+        else
+        {
+            adminUser.FullName = "Администратор TechHub";
+            adminUser.Email = "cilondiom@gmail.com";
+            adminUser.Role = UserRole.Admin;
+            adminUser.IsActive = true;
+            adminUser.IsEmailConfirmed = true;
+            adminUser.PasswordHash = hasher.HashPassword(adminUser, "Moon_GGWW52");
+            await context.SaveChangesAsync();
+        }
+
+        // Мастер-инвайты для регистрации преподавателей и доп. администраторов
+        var masterCodes = new[] { "ADMIN-TECHHUB-2026-M8W2", "ADMIN-TECHHUB-2026-X7K9" };
         foreach (var code in masterCodes)
         {
             var existingToken = await context.SystemInviteTokens.FirstOrDefaultAsync(t => t.Token == code);
@@ -100,16 +112,10 @@ public static class DbInitializer
                 {
                     Token = code,
                     TargetRole = UserRole.Admin,
-                    Note = "Мастер-инвайт для регистрации Администратора системы TechHub",
+                    Note = "Мастер-инвайт Администратора TechHub",
                     CreatedAt = DateTime.UtcNow,
                     IsUsed = false
                 });
-            }
-            else if (!hasConfirmedAdmin)
-            {
-                existingToken.IsUsed = false;
-                existingToken.UsedByUserId = null;
-                existingToken.UsedAt = null;
             }
         }
         await context.SaveChangesAsync();
