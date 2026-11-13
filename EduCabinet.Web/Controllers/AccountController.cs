@@ -204,7 +204,7 @@ public class AccountController : Controller
             );
 
             TempData["SuccessMessage"] = $"Регистрация успешна! На почту {user.Email} отправлен 6-значный код подтверждения.";
-            return RedirectToAction(nameof(VerifyEmail), new { email = user.Email, devCode = _env.IsDevelopment() ? code : null });
+            return RedirectToAction(nameof(VerifyEmail), new { email = user.Email });
         }
         catch (Exception ex)
         {
@@ -369,7 +369,7 @@ public class AccountController : Controller
             );
 
             TempData["SuccessMessage"] = $"Регистрация успешна! На почту {user.Email} отправлен 6-значный код подтверждения.";
-            return RedirectToAction(nameof(VerifyEmail), new { email = user.Email, devCode = _env.IsDevelopment() ? code : null });
+            return RedirectToAction(nameof(VerifyEmail), new { email = user.Email });
         }
         catch (Exception ex)
         {
@@ -380,26 +380,16 @@ public class AccountController : Controller
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> VerifyEmail(string? email, string? devCode)
+    public IActionResult VerifyEmail(string? email)
     {
         if (string.IsNullOrWhiteSpace(email))
         {
             return RedirectToAction(nameof(Login));
         }
 
-        string? hint = devCode;
-        if (string.IsNullOrEmpty(hint) && _env.IsDevelopment())
-        {
-            hint = await _db.Users
-                .Where(u => u.Email != null && u.Email.ToLower() == email.Trim().ToLower())
-                .Select(u => u.EmailConfirmationCode)
-                .FirstOrDefaultAsync();
-        }
-
         return View(new VerifyEmailViewModel
         {
-            Email = email.Trim(),
-            DevHintCode = hint
+            Email = email.Trim()
         });
     }
 
@@ -437,10 +427,6 @@ public class AccountController : Controller
             user.EmailConfirmationExpiresAt < DateTime.UtcNow)
         {
             ModelState.AddModelError("Code", "Неверный или истекший код подтверждения.");
-            if (_env.IsDevelopment())
-            {
-                model.DevHintCode = user.EmailConfirmationCode;
-            }
             return View(model);
         }
 
@@ -485,7 +471,7 @@ public class AccountController : Controller
 
             await _emailService.SendConfirmationCodeAsync(user.Email!, code, user.FullName);
             TempData["SuccessMessage"] = $"Новый код подтверждения отправлен на {user.Email}.";
-            return RedirectToAction(nameof(VerifyEmail), new { email = user.Email, devCode = _env.IsDevelopment() ? code : null });
+            return RedirectToAction(nameof(VerifyEmail), new { email = user.Email });
         }
 
         TempData["WarningMessage"] = "Пользователь не найден или адрес уже подтвержден.";
@@ -539,31 +525,21 @@ public class AccountController : Controller
         );
 
         TempData["SuccessMessage"] = $"Код для восстановления пароля отправлен на почту {MaskEmail(user.Email)}.";
-        return RedirectToAction(nameof(ResetPassword), new { email = user.Email, devCode = _env.IsDevelopment() ? code : null });
+        return RedirectToAction(nameof(ResetPassword), new { email = user.Email });
     }
 
     [HttpGet]
     [AllowAnonymous]
-    public async Task<IActionResult> ResetPassword(string? email, string? devCode)
+    public IActionResult ResetPassword(string? email)
     {
         if (string.IsNullOrWhiteSpace(email))
         {
             return RedirectToAction(nameof(ForgotPassword));
         }
 
-        string? hint = devCode;
-        if (string.IsNullOrEmpty(hint) && _env.IsDevelopment())
-        {
-            hint = await _db.Users
-                .Where(u => u.Email != null && u.Email.ToLower() == email.Trim().ToLower())
-                .Select(u => u.PasswordResetCode)
-                .FirstOrDefaultAsync();
-        }
-
         return View(new ResetPasswordViewModel
         {
-            Email = email.Trim(),
-            DevHintCode = hint
+            Email = email.Trim()
         });
     }
 
@@ -591,10 +567,6 @@ public class AccountController : Controller
             user.PasswordResetExpiresAt < DateTime.UtcNow)
         {
             ModelState.AddModelError("Code", "Неверный или истекший код сброса пароля.");
-            if (_env.IsDevelopment())
-            {
-                model.DevHintCode = user.PasswordResetCode;
-            }
             return View(model);
         }
 

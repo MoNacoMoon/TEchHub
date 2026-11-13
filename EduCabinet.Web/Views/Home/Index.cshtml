@@ -37,46 +37,10 @@
             </div>
         </div>
 
-        <div>
-            <!-- Информационная карточка быстрого доступа к кабинетам -->
-            <div class="portal-role-card p-4 rounded-3" style="background: var(--bg-surface-raised); border: 1px solid var(--hairline); box-shadow: var(--shadow-sm);">
-                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="d-inline-flex align-items-center justify-content-center rounded-circle" style="width: 32px; height: 32px; background: var(--primary-glow); color: var(--primary);">
-                            <i class="bi bi-mortarboard-fill"></i>
-                        </span>
-                        <span class="fw-semibold" style="font-size: 0.9rem;">Вход в кабинет</span>
-                    </div>
-                    <span class="quiet-tag positive font-mono">1–4 курсы</span>
-                </div>
-
-                <div class="d-grid gap-2">
-                    <a asp-controller="Account" asp-action="Login" class="portal-nav-btn p-3 rounded-2 text-decoration-none d-flex align-items-center justify-content-between" style="background: var(--bg-surface); border: 1px solid var(--hairline);">
-                        <div class="d-flex align-items-center gap-3">
-                            <div class="portal-btn-icon bg-primary-subtle text-primary p-2 rounded">
-                                <i class="bi bi-person-workspace fs-5"></i>
-                            </div>
-                            <div>
-                                <div class="fw-bold text-primary" style="font-size: 0.9rem;">Кабинет преподавателя / Администратора</div>
-                                <div class="text-muted small">Журнал успеваемости, лекции и тесты</div>
-                            </div>
-                        </div>
-                        <i class="bi bi-arrow-right text-primary"></i>
-                    </a>
-
-                    <a asp-controller="Account" asp-action="Register" class="portal-nav-btn p-3 rounded-2 text-decoration-none d-flex align-items-center justify-content-between" style="background: var(--bg-surface); border: 1px solid var(--hairline);">
-                        <div class="d-flex align-items-center gap-3">
-                            <div class="portal-btn-icon bg-success-subtle text-success p-2 rounded">
-                                <i class="bi bi-person-check fs-5"></i>
-                            </div>
-                            <div>
-                                <div class="fw-bold text-success" style="font-size: 0.9rem;">Регистрация студента</div>
-                                <div class="text-muted small">Зачисление по инвайт-кодам групп (111–415)</div>
-                            </div>
-                        </div>
-                        <i class="bi bi-arrow-right text-success"></i>
-                    </a>
-                </div>
+        <div class="d-none d-lg-flex justify-content-center align-items-center">
+            <div class="p-3 rounded-4" style="background: var(--bg-surface-raised); border: 1px solid var(--hairline); box-shadow: var(--shadow-sm);">
+                <img src="~/images/logo-dark.jpg" class="logo-theme-dark img-fluid rounded-3" alt="TechHub" style="max-height: 190px; object-fit: contain;" />
+                <img src="~/images/logo-light.jpg" class="logo-theme-light img-fluid rounded-3" alt="TechHub" style="max-height: 190px; object-fit: contain;" />
             </div>
         </div>
     </div>

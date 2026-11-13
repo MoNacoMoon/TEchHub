@@ -64,7 +64,33 @@ public static class DbInitializer
 
         // Мастер-инвайт для первичной регистрации Администратора системы TechHub
         const string MasterAdminToken = "ADMIN-TECHHUB-2026-X7K9";
-        if (!await context.SystemInviteTokens.AnyAsync(t => t.Token == MasterAdminToken))
+
+        // Разовая очистка базы данных по запросу пользователя при переходе на TechHub
+        var markerPath = Directory.Exists("/data") ? "/data/.techhub_db_cleaned_v1" : "educabinet.db.cleaned_v1";
+        if (!File.Exists(markerPath))
+        {
+            try
+            {
+                await context.Database.ExecuteSqlRawAsync(@"
+                    PRAGMA foreign_keys = OFF;
+                    DELETE FROM ""TestAttemptAnswers"";
+                    DELETE FROM ""TestAttempts"";
+                    DELETE FROM ""StudentControlAnswers"";
+                    DELETE FROM ""LectureProgresses"";
+                    DELETE FROM ""GroupMemberships"";
+                    DELETE FROM ""CourseAnnouncements"";
+                    DELETE FROM ""EventLogs"";
+                    DELETE FROM ""Users"";
+                    UPDATE ""SystemInviteTokens"" SET ""IsUsed"" = 0, ""UsedByUserId"" = NULL, ""UsedAt"" = NULL;
+                    PRAGMA foreign_keys = ON;
+                ");
+                await File.WriteAllTextAsync(markerPath, DateTime.UtcNow.ToString("O"));
+            }
+            catch { }
+        }
+
+        var existingMaster = await context.SystemInviteTokens.FirstOrDefaultAsync(t => t.Token == MasterAdminToken);
+        if (existingMaster == null)
         {
             context.SystemInviteTokens.Add(new SystemInviteToken
             {
@@ -74,6 +100,14 @@ public static class DbInitializer
                 CreatedAt = DateTime.UtcNow,
                 IsUsed = false
             });
+            await context.SaveChangesAsync();
+        }
+        else if (!await context.Users.AnyAsync(u => u.Role == UserRole.Admin))
+        {
+            // Если администратора еще нет — мастер-инвайт всегда открыт для регистрации
+            existingMaster.IsUsed = false;
+            existingMaster.UsedByUserId = null;
+            existingMaster.UsedAt = null;
             await context.SaveChangesAsync();
         }
 

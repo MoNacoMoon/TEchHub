@@ -21,21 +21,9 @@
                 На адрес <strong class="text-body font-mono">@Model.Email</strong> отправлен 6-значный код подтверждения. Введите его ниже для завершения регистрации в TechHub.
             </p>
 
-            @if (!string.IsNullOrEmpty(Model.DevHintCode))
-            {
-                <div class="alert alert-info py-2 px-3 small mb-3 d-flex align-items-center justify-content-between">
-                    <div>
-                        <i class="bi bi-info-circle me-1"></i>
-                        <span>Код для тестирования (Dev-режим):</span>
-                    </div>
-                    <code class="fs-6 fw-bold px-2 py-1 bg-white text-dark rounded border font-mono">@Model.DevHintCode</code>
-                </div>
-            }
-
             <form asp-action="VerifyEmail" method="post">
                 @Html.AntiForgeryToken()
                 <input type="hidden" asp-for="Email" />
-                <input type="hidden" asp-for="DevHintCode" />
 
                 <div asp-validation-summary="ModelOnly" class="alert alert-danger p-2 small mb-3"></div>
 
