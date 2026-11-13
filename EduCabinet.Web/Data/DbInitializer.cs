@@ -62,17 +62,23 @@ public static class DbInitializer
         }
         catch { }
 
-        // Мастер-инвайт для первичной регистрации Администратора системы TechHub
-        const string MasterAdminToken = "ADMIN-TECHHUB-2026-X7K9";
+        // Мастер-инвайты для первичной регистрации Администратора системы TechHub
+        var masterCodes = new[] { "ADMIN-TECHHUB-2026-M8W2", "ADMIN-TECHHUB-2026-X7K9" };
 
-        // Разовая очистка базы данных по запросу пользователя при переходе на TechHub
-        var markerPath = Directory.Exists("/data") ? "/data/.techhub_db_cleaned_v1" : "educabinet.db.cleaned_v1";
-        if (!File.Exists(markerPath))
+        // Если в системе еще нет подтвержденного администратора — очищаем старые/незавершенные регистрации
+        var hasConfirmedAdmin = await context.Users.AnyAsync(u => u.Role == UserRole.Admin && u.IsEmailConfirmed);
+        if (!hasConfirmedAdmin)
         {
+            var oldUsers = await context.Users.ToListAsync();
+            if (oldUsers.Any())
+            {
+                context.Users.RemoveRange(oldUsers);
+                await context.SaveChangesAsync();
+            }
+
             try
             {
                 await context.Database.ExecuteSqlRawAsync(@"
-                    PRAGMA foreign_keys = OFF;
                     DELETE FROM ""TestAttemptAnswers"";
                     DELETE FROM ""TestAttempts"";
                     DELETE FROM ""StudentControlAnswers"";
@@ -80,36 +86,33 @@ public static class DbInitializer
                     DELETE FROM ""GroupMemberships"";
                     DELETE FROM ""CourseAnnouncements"";
                     DELETE FROM ""EventLogs"";
-                    DELETE FROM ""Users"";
-                    UPDATE ""SystemInviteTokens"" SET ""IsUsed"" = 0, ""UsedByUserId"" = NULL, ""UsedAt"" = NULL;
-                    PRAGMA foreign_keys = ON;
                 ");
-                await File.WriteAllTextAsync(markerPath, DateTime.UtcNow.ToString("O"));
             }
             catch { }
         }
 
-        var existingMaster = await context.SystemInviteTokens.FirstOrDefaultAsync(t => t.Token == MasterAdminToken);
-        if (existingMaster == null)
+        foreach (var code in masterCodes)
         {
-            context.SystemInviteTokens.Add(new SystemInviteToken
+            var existingToken = await context.SystemInviteTokens.FirstOrDefaultAsync(t => t.Token == code);
+            if (existingToken == null)
             {
-                Token = MasterAdminToken,
-                TargetRole = UserRole.Admin,
-                Note = "Мастер-инвайт для регистрации Администратора системы TechHub",
-                CreatedAt = DateTime.UtcNow,
-                IsUsed = false
-            });
-            await context.SaveChangesAsync();
+                context.SystemInviteTokens.Add(new SystemInviteToken
+                {
+                    Token = code,
+                    TargetRole = UserRole.Admin,
+                    Note = "Мастер-инвайт для регистрации Администратора системы TechHub",
+                    CreatedAt = DateTime.UtcNow,
+                    IsUsed = false
+                });
+            }
+            else if (!hasConfirmedAdmin)
+            {
+                existingToken.IsUsed = false;
+                existingToken.UsedByUserId = null;
+                existingToken.UsedAt = null;
+            }
         }
-        else if (!await context.Users.AnyAsync(u => u.Role == UserRole.Admin))
-        {
-            // Если администратора еще нет — мастер-инвайт всегда открыт для регистрации
-            existingMaster.IsUsed = false;
-            existingMaster.UsedByUserId = null;
-            existingMaster.UsedAt = null;
-            await context.SaveChangesAsync();
-        }
+        await context.SaveChangesAsync();
 
         // 1. Проверяем и создаем 20 групп колледжа (1-4 курс, 111-115, 211-215, 311-315, 411-415)
         var existingGroups = await context.StudentGroups.ToListAsync();

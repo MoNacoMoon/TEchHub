@@ -159,13 +159,38 @@ public class AccountController : Controller
             }
         }
 
+        if (!string.IsNullOrWhiteSpace(model.Username))
+        {
+            var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == model.Username.Trim().ToLower());
+            if (existingUser != null)
+            {
+                if (!existingUser.IsEmailConfirmed)
+                {
+                    _db.Users.Remove(existingUser);
+                    await _db.SaveChangesAsync();
+                }
+                else
+                {
+                    ModelState.AddModelError("Username", "Пользователь с таким логином уже занят.");
+                }
+            }
+        }
+
         if (!string.IsNullOrWhiteSpace(model.Email))
         {
             var cleanEmail = model.Email.Trim().ToLower();
-            var emailExists = await _db.Users.AnyAsync(u => u.Email != null && u.Email.ToLower() == cleanEmail);
-            if (emailExists)
+            var existingEmailUser = await _db.Users.FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == cleanEmail);
+            if (existingEmailUser != null)
             {
-                ModelState.AddModelError("Email", "Пользователь с таким адресом электронной почты уже зарегистрирован.");
+                if (!existingEmailUser.IsEmailConfirmed)
+                {
+                    _db.Users.Remove(existingEmailUser);
+                    await _db.SaveChangesAsync();
+                }
+                else
+                {
+                    ModelState.AddModelError("Email", "Пользователь с таким адресом электронной почты уже зарегистрирован.");
+                }
             }
         }
 
@@ -217,7 +242,7 @@ public class AccountController : Controller
     [AllowAnonymous]
     public IActionResult RegisterAdmin(string? code = null)
     {
-        return RedirectToAction(nameof(RegisterStaff), new { code = code ?? "ADMIN-TECHHUB-2026-X7K9" });
+        return RedirectToAction(nameof(RegisterStaff), new { code = code ?? "ADMIN-TECHHUB-2026-M8W2" });
     }
 
     [HttpGet]
@@ -237,6 +262,13 @@ public class AccountController : Controller
             var token = await _db.SystemInviteTokens.FirstOrDefaultAsync(t => t.Token.ToUpper() == clean);
             if (token != null)
             {
+                var hasConfirmedAdmin = await _db.Users.AnyAsync(u => u.Role == UserRole.Admin && u.IsEmailConfirmed);
+                if (token.TargetRole == UserRole.Admin && !hasConfirmedAdmin)
+                {
+                    token.IsUsed = false;
+                    await _db.SaveChangesAsync();
+                }
+
                 if (token.IsUsed)
                 {
                     ModelState.AddModelError("InviteCode", "Этот инвайт-код уже был использован.");
@@ -280,36 +312,62 @@ public class AccountController : Controller
         {
             ModelState.AddModelError("InviteCode", "Недействительный инвайт-код.");
         }
-        else if (token.IsUsed)
-        {
-            ModelState.AddModelError("InviteCode", "Этот инвайт-код уже был использован.");
-        }
-        else if (token.ExpiresAt.HasValue && token.ExpiresAt < DateTime.UtcNow)
-        {
-            ModelState.AddModelError("InviteCode", "Срок действия инвайт-кода истек.");
-        }
         else
         {
-            model.TargetRole = token.TargetRole;
-            model.Note = token.Note;
+            var hasConfirmedAdmin = await _db.Users.AnyAsync(u => u.Role == UserRole.Admin && u.IsEmailConfirmed);
+            if (token.TargetRole == UserRole.Admin && !hasConfirmedAdmin)
+            {
+                token.IsUsed = false;
+                await _db.SaveChangesAsync();
+            }
+
+            if (token.IsUsed)
+            {
+                ModelState.AddModelError("InviteCode", "Этот инвайт-код уже был использован.");
+            }
+            else if (token.ExpiresAt.HasValue && token.ExpiresAt < DateTime.UtcNow)
+            {
+                ModelState.AddModelError("InviteCode", "Срок действия инвайт-кода истек.");
+            }
+            else
+            {
+                model.TargetRole = token.TargetRole;
+                model.Note = token.Note;
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(model.Username))
         {
-            var userExists = await _db.Users.AnyAsync(u => u.Username.ToLower() == model.Username.Trim().ToLower());
-            if (userExists)
+            var existingUser = await _db.Users.FirstOrDefaultAsync(u => u.Username.ToLower() == model.Username.Trim().ToLower());
+            if (existingUser != null)
             {
-                ModelState.AddModelError("Username", "Пользователь с таким логином уже существует.");
+                if (!existingUser.IsEmailConfirmed)
+                {
+                    _db.Users.Remove(existingUser);
+                    await _db.SaveChangesAsync();
+                }
+                else
+                {
+                    ModelState.AddModelError("Username", "Пользователь с таким логином уже занят.");
+                }
             }
         }
 
         if (!string.IsNullOrWhiteSpace(model.Email))
         {
             var cleanEmail = model.Email.Trim().ToLower();
-            var emailExists = await _db.Users.AnyAsync(u => u.Email != null && u.Email.ToLower() == cleanEmail);
-            if (emailExists)
+            var existingEmailUser = await _db.Users.FirstOrDefaultAsync(u => u.Email != null && u.Email.ToLower() == cleanEmail);
+            if (existingEmailUser != null)
             {
-                ModelState.AddModelError("Email", "Пользователь с таким адресом электронной почты уже зарегистрирован.");
+                if (!existingEmailUser.IsEmailConfirmed)
+                {
+                    _db.Users.Remove(existingEmailUser);
+                    await _db.SaveChangesAsync();
+                }
+                else
+                {
+                    ModelState.AddModelError("Email", "Пользователь с таким адресом электронной почты уже зарегистрирован.");
+                }
             }
         }
 

@@ -31,7 +31,20 @@ public class DbInitializerTests
 
             try
             {
+                // Add a dummy test user before seed
+                context.Users.Add(new User
+                {
+                    Username = "olduser",
+                    FullName = "Old User",
+                    Email = "old@example.com",
+                    PasswordHash = "hash"
+                });
+                await context.SaveChangesAsync();
+                Assert.Equal(1, context.Users.Count());
+
                 await DbInitializer.SeedAsync(context, fakeEnv);
+
+                Assert.Equal(0, context.Users.Count());
 
                 // Assertions for clean hand-off: Master Admin token is seeded for initial registration
                 Assert.True(context.SystemInviteTokens.Any(t => t.TargetRole == UserRole.Admin && !t.IsUsed));
