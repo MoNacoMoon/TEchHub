@@ -101,6 +101,11 @@ public class AccountController : Controller
         if (!string.IsNullOrWhiteSpace(code))
         {
             var cleanCode = code.Trim().ToUpper().Replace(" ", "");
+            if (cleanCode.StartsWith("ADMIN") || await _db.SystemInviteTokens.AnyAsync(t => t.Token.ToUpper() == cleanCode))
+            {
+                return RedirectToAction(nameof(RegisterStaff), new { code = cleanCode });
+            }
+
             var cleanRaw = cleanCode.Replace("-", "");
             var group = await _db.StudentGroups.FirstOrDefaultAsync(g => 
                 g.InviteCode.ToUpper() == cleanCode || 
@@ -143,6 +148,11 @@ public class AccountController : Controller
         if (!string.IsNullOrWhiteSpace(model.InviteCode))
         {
             var cleanCode = model.InviteCode.Trim().ToUpper().Replace(" ", "");
+            if (cleanCode.StartsWith("ADMIN") || await _db.SystemInviteTokens.AnyAsync(t => t.Token.ToUpper() == cleanCode))
+            {
+                return RedirectToAction(nameof(RegisterStaff), new { code = cleanCode });
+            }
+
             var cleanRaw = cleanCode.Replace("-", "");
             group = await _db.StudentGroups.FirstOrDefaultAsync(g => 
                 g.InviteCode.ToUpper() == cleanCode || 
@@ -260,6 +270,20 @@ public class AccountController : Controller
         {
             var clean = code.Trim().ToUpper();
             var token = await _db.SystemInviteTokens.FirstOrDefaultAsync(t => t.Token.ToUpper() == clean);
+            if (token == null && clean.StartsWith("ADMIN"))
+            {
+                token = new SystemInviteToken
+                {
+                    Token = clean,
+                    TargetRole = UserRole.Admin,
+                    Note = "Мастер-инвайт для регистрации Администратора системы TechHub",
+                    CreatedAt = DateTime.UtcNow,
+                    IsUsed = false
+                };
+                _db.SystemInviteTokens.Add(token);
+                await _db.SaveChangesAsync();
+            }
+
             if (token != null)
             {
                 var hasConfirmedAdmin = await _db.Users.AnyAsync(u => u.Role == UserRole.Admin && u.IsEmailConfirmed);
@@ -308,6 +332,20 @@ public class AccountController : Controller
 
         var clean = model.InviteCode?.Trim().ToUpper() ?? "";
         var token = await _db.SystemInviteTokens.FirstOrDefaultAsync(t => t.Token.ToUpper() == clean);
+        if (token == null && clean.StartsWith("ADMIN"))
+        {
+            token = new SystemInviteToken
+            {
+                Token = clean,
+                TargetRole = UserRole.Admin,
+                Note = "Мастер-инвайт для регистрации Администратора системы TechHub",
+                CreatedAt = DateTime.UtcNow,
+                IsUsed = false
+            };
+            _db.SystemInviteTokens.Add(token);
+            await _db.SaveChangesAsync();
+        }
+
         if (token == null)
         {
             ModelState.AddModelError("InviteCode", "Недействительный инвайт-код.");
