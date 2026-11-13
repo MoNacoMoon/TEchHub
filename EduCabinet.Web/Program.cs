@@ -1,5 +1,6 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi;
@@ -34,6 +35,13 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     }
     options.UseSqlite(connString);
 });
+
+// Защита данных и синхронизация ключей сессий между репликами
+var keysDir = Directory.Exists("/data") ? "/data/dataprotection-keys" : "dataprotection-keys";
+try { Directory.CreateDirectory(keysDir); } catch { }
+builder.Services.AddDataProtection()
+    .PersistKeysToFileSystem(new DirectoryInfo(keysDir))
+    .SetApplicationName("TechHub");
 
 // Аутентификация на Cookie (Защита сессионных куки: HttpOnly, SameSite, Secure)
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)

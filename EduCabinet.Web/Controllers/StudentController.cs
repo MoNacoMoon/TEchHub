@@ -35,7 +35,7 @@ public class StudentController : Controller
     private int GetCurrentStudentId()
     {
         var idClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        return int.Parse(idClaim!);
+        return int.TryParse(idClaim, out int id) ? id : 0;
     }
 
     // Главная страница кабинета студента - список доступных дисциплин и общий прогресс

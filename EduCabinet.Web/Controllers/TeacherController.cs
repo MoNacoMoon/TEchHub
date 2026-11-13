@@ -60,54 +60,66 @@ public class TeacherController : Controller
     private int GetCurrentUserId()
     {
         var idClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        return int.Parse(idClaim!);
+        return int.TryParse(idClaim, out int id) ? id : 0;
     }
 
     // Главная панель преподавателя
     public async Task<IActionResult> Index()
     {
-        int teacherId = GetCurrentUserId();
-
-        var disciplines = await _db.Disciplines
-            .Include(d => d.Topics)
-                .ThenInclude(t => t.Lectures)
-            .Include(d => d.DisciplineGroups)
-            .ToListAsync();
-
-        int disciplinesCount = disciplines.Count;
-        int topicsCount = disciplines.SelectMany(d => d.Topics).Count();
-        int lecturesCount = disciplines.SelectMany(d => d.Topics).SelectMany(t => t.Lectures).Count();
-        int studentsCount = await _db.Users.CountAsync(u => u.Role == UserRole.Student);
-
-        // Количество ответов, ожидающих ручной проверки преподавателем
-        int pendingReviews = await _db.StudentControlAnswers
-            .Include(a => a.ControlQuestion)
-            .CountAsync(a => a.ControlQuestion.Type == QuestionType.OpenEnded && !a.IsReviewedByTeacher);
-
-        var recentLogs = await _db.EventLogs
-            .OrderByDescending(l => l.Timestamp)
-            .Take(10)
-            .ToListAsync();
-
-        var model = new TeacherDashboardViewModel
+        try
         {
-            DisciplinesCount = disciplinesCount,
-            TopicsCount = topicsCount,
-            LecturesCount = lecturesCount,
-            StudentsCount = studentsCount,
-            PendingReviewsCount = pendingReviews,
-            RecentLogs = recentLogs,
-            Disciplines = disciplines.Select(d => new DisciplineSummaryDto
-            {
-                Id = d.Id,
-                Title = d.Title,
-                TopicsCount = d.Topics.Count,
-                LecturesCount = d.Topics.SelectMany(t => t.Lectures).Count(),
-                EnrolledStudentsCount = d.DisciplineGroups.Count // или количество студентов в привязанных группах
-            }).ToList()
-        };
+            int teacherId = GetCurrentUserId();
 
-        return View(model);
+            var disciplines = await _db.Disciplines
+                .Include(d => d.Topics)
+                    .ThenInclude(t => t.Lectures)
+                .Include(d => d.DisciplineGroups)
+                .ToListAsync();
+
+            int disciplinesCount = disciplines.Count;
+            int topicsCount = disciplines.SelectMany(d => d.Topics ?? Enumerable.Empty<Topic>()).Count();
+            int lecturesCount = disciplines.SelectMany(d => d.Topics ?? Enumerable.Empty<Topic>()).SelectMany(t => t.Lectures ?? Enumerable.Empty<Lecture>()).Count();
+            int studentsCount = await _db.Users.CountAsync(u => u.Role == UserRole.Student);
+
+            int pendingReviews = 0;
+            try
+            {
+                pendingReviews = await _db.StudentControlAnswers
+                    .Include(a => a.ControlQuestion)
+                    .CountAsync(a => a.ControlQuestion != null && a.ControlQuestion.Type == QuestionType.OpenEnded && !a.IsReviewedByTeacher);
+            }
+            catch { }
+
+            var recentLogs = await _db.EventLogs
+                .OrderByDescending(l => l.Timestamp)
+                .Take(10)
+                .ToListAsync();
+
+            var model = new TeacherDashboardViewModel
+            {
+                DisciplinesCount = disciplinesCount,
+                TopicsCount = topicsCount,
+                LecturesCount = lecturesCount,
+                StudentsCount = studentsCount,
+                PendingReviewsCount = pendingReviews,
+                RecentLogs = recentLogs,
+                Disciplines = disciplines.Select(d => new DisciplineSummaryDto
+                {
+                    Id = d.Id,
+                    Title = d.Title,
+                    TopicsCount = d.Topics?.Count ?? 0,
+                    LecturesCount = d.Topics?.SelectMany(t => t.Lectures ?? Enumerable.Empty<Lecture>()).Count() ?? 0,
+                    EnrolledStudentsCount = d.DisciplineGroups?.Count ?? 0
+                }).ToList()
+            };
+
+            return View(model);
+        }
+        catch (Exception ex)
+        {
+            await _eventLogger.LogActionAsync(null, "TEACHER_INDEX_ERROR", ex.Message);
+            return View(new TeacherDashboardViewModel());
+        }
     }
 
     // ==========================================

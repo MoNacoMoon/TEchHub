@@ -39,6 +39,10 @@ public class HomeController : Controller
 
     public IActionResult Error()
     {
+        var feature = HttpContext.Features.Get<Microsoft.AspNetCore.Diagnostics.IExceptionHandlerPathFeature>();
+        ViewBag.ErrorMessage = feature?.Error?.Message;
+        ViewBag.ErrorDetails = feature?.Error?.ToString();
+        ViewBag.ErrorPath = feature?.Path;
         return View();
     }
 }

@@ -59,11 +59,12 @@ public class AuthService : IAuthService
 
     public async Task SignInUserAsync(HttpContext httpContext, User user)
     {
+        var fullName = string.IsNullOrWhiteSpace(user.FullName) ? (user.Username ?? "Пользователь") : user.FullName;
         var claims = new List<Claim>
         {
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Username),
-            new Claim("FullName", user.FullName),
+            new Claim(ClaimTypes.Name, user.Username ?? ""),
+            new Claim("FullName", fullName),
             new Claim(ClaimTypes.Role, user.Role.ToString())
         };
 

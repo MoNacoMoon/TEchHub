@@ -50,41 +50,54 @@ public class AccountController : Controller
     [EnableRateLimiting("auth")]
     public async Task<IActionResult> Login(LoginViewModel model)
     {
-        if (!ModelState.IsValid)
+        try
         {
+            if (!ModelState.IsValid)
+            {
+                return View(model);
+            }
+
+            var user = await _authService.AuthenticateAsync(model.Username, model.Password);
+            if (user == null)
+            {
+                ModelState.AddModelError(string.Empty, "Неверный логин или пароль");
+                return View(model);
+            }
+
+            if (user.Role == UserRole.Student && !user.IsEmailConfirmed)
+            {
+                TempData["WarningMessage"] = "Для входа в систему необходимо подтвердить адрес электронной почты.";
+                return RedirectToAction(nameof(VerifyEmail), new { email = user.Email });
+            }
+
+            await _authService.SignInUserAsync(HttpContext, user);
+
+            try
+            {
+                await _eventLogger.LogActionAsync(
+                    user.Id,
+                    "LOGIN",
+                    $"Вход в систему пользователя {user.FullName} ({user.Username}), роль: {user.Role}",
+                    null,
+                    null,
+                    HttpContext.Connection.RemoteIpAddress?.ToString()
+                );
+            }
+            catch { }
+
+            if (!string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
+            {
+                return Redirect(model.ReturnUrl);
+            }
+
+            return RedirectToUserHome(user.Role);
+        }
+        catch (Exception ex)
+        {
+            await _eventLogger.LogActionAsync(null, "LOGIN_ERROR", ex.Message);
+            ModelState.AddModelError(string.Empty, "Ошибка входа: " + ex.Message);
             return View(model);
         }
-
-        var user = await _authService.AuthenticateAsync(model.Username, model.Password);
-        if (user == null)
-        {
-            ModelState.AddModelError(string.Empty, "Неверный логин или пароль");
-            return View(model);
-        }
-
-        if (user.Role == UserRole.Student && !user.IsEmailConfirmed)
-        {
-            TempData["WarningMessage"] = "Для входа в систему необходимо подтвердить адрес электронной почты.";
-            return RedirectToAction(nameof(VerifyEmail), new { email = user.Email });
-        }
-
-        await _authService.SignInUserAsync(HttpContext, user);
-
-        await _eventLogger.LogActionAsync(
-            user.Id,
-            "LOGIN",
-            $"Вход в систему пользователя {user.FullName} ({user.Username}), роль: {user.Role}",
-            null,
-            null,
-            HttpContext.Connection.RemoteIpAddress?.ToString()
-        );
-
-        if (!string.IsNullOrEmpty(model.ReturnUrl) && Url.IsLocalUrl(model.ReturnUrl))
-        {
-            return Redirect(model.ReturnUrl);
-        }
-
-        return RedirectToUserHome(user.Role);
     }
 
     [HttpGet]
