@@ -48,12 +48,6 @@ public class DbInitializerTests
 
                 // Assertions for clean hand-off: Master Admin token is seeded for initial registration
                 Assert.True(context.SystemInviteTokens.Any(t => t.TargetRole == UserRole.Admin && !t.IsUsed));
-                Assert.Equal(20, context.StudentGroups.Count());
-                Assert.Equal(5, context.StudentGroups.Count(g => g.CourseNumber == 1));
-                Assert.Equal(5, context.StudentGroups.Count(g => g.CourseNumber == 2));
-                Assert.Equal(5, context.StudentGroups.Count(g => g.CourseNumber == 3));
-                Assert.Equal(5, context.StudentGroups.Count(g => g.CourseNumber == 4));
-                Assert.True(context.StudentGroups.All(g => !string.IsNullOrEmpty(g.InviteCode)));
 
                 var projectDb = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "EduCabinet.Web", "educabinet.db"));
                 TestHelper.CheckpointDatabase(projectDb);

@@ -120,30 +120,20 @@ public static class DbInitializer
         }
         await context.SaveChangesAsync();
 
-        // 1. Проверяем и создаем 20 групп колледжа (1-4 курс, 111-115, 211-215, 311-315, 411-415)
-        var existingGroups = await context.StudentGroups.ToListAsync();
-        var existingNames = existingGroups.Select(g => g.Name).ToHashSet();
+        // Очищаем автоматически созданные пустые группы 111-415, чтобы они не восстанавливались после удаления пользователем
+        var defaultGroupNames = (from course in Enumerable.Range(1, 4)
+                                 from groupIdx in Enumerable.Range(1, 5)
+                                 select $"{course}1{groupIdx}").ToHashSet();
 
-        for (int course = 1; course <= 4; course++)
+        var resurrectedGroups = await context.StudentGroups
+            .Include(g => g.Memberships)
+            .Where(g => defaultGroupNames.Contains(g.Name) && !g.Memberships.Any() && !context.DisciplineGroups.Any(dg => dg.GroupId == g.Id))
+            .ToListAsync();
+
+        if (resurrectedGroups.Any())
         {
-            int durationYears = (course == 3) ? 3 : 4; // 3 года или 4 года обучения
-            for (int groupIdx = 1; groupIdx <= 5; groupIdx++)
-            {
-                string groupName = $"{course}1{groupIdx}";
-                if (!existingNames.Contains(groupName))
-                {
-                    context.StudentGroups.Add(new StudentGroup
-                    {
-                        Name = groupName,
-                        Description = $"Учебная группа {groupName}, {course} курс ({durationYears} года обучения)",
-                        InviteCode = Services.InviteCodeGenerator.GenerateCode(groupName),
-                        CourseNumber = course,
-                        StudyDurationYears = durationYears,
-                        AdmissionYear = 2026
-                    });
-                }
-            }
+            context.StudentGroups.RemoveRange(resurrectedGroups);
+            await context.SaveChangesAsync();
         }
-        await context.SaveChangesAsync();
     }
 }
