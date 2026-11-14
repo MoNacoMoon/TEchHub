@@ -12,6 +12,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <!-- Фавикон вкладки браузера TechHub (поддержка динамической смены темы) -->
+    <link id="appFavicon" rel="icon" type="image/png" sizes="64x64" href="~/favicon.png" />
+    <link rel="apple-touch-icon" href="~/apple-touch-icon.png" />
     <!-- Применение темы до отрисовки DOM для устранения мерцания -->
     <script>
         (function() {
@@ -20,6 +23,10 @@
                     (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
                 document.documentElement.setAttribute('data-bs-theme', saved);
                 document.documentElement.setAttribute('data-theme', saved);
+                var fav = document.getElementById('appFavicon');
+                if (fav) {
+                    fav.href = (saved === 'light') ? '/favicon-light.png' : '/favicon.png';
+                }
             } catch(e) {}
         })();
     </script>

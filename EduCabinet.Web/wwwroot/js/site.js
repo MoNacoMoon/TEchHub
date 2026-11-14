@@ -20,6 +20,11 @@ window.applyAppTheme = function (theme) {
         localStorage.setItem(STORAGE_KEY, theme);
     } catch (e) {}
 
+    const fav = document.getElementById('appFavicon');
+    if (fav) {
+        fav.href = (theme === 'light') ? '/favicon-light.png' : '/favicon.png';
+    }
+
     window.updateThemeUI(theme);
 };
 
