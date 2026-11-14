@@ -46,9 +46,6 @@ public class DbInitializerTests
 
                 Assert.True(context.Users.Any(u => u.Username == "DilaAdmin" && u.Role == UserRole.Admin));
 
-                // Assertions for clean hand-off: Master Admin token is seeded for initial registration
-                Assert.True(context.SystemInviteTokens.Any(t => t.TargetRole == UserRole.Admin && !t.IsUsed));
-
                 var projectDb = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "EduCabinet.Web", "educabinet.db"));
                 TestHelper.CheckpointDatabase(projectDb);
             }

@@ -265,7 +265,7 @@ public class AccountController : Controller
     [AllowAnonymous]
     public IActionResult RegisterAdmin(string? code = null)
     {
-        return RedirectToAction(nameof(RegisterStaff), new { code = code ?? "ADMIN-TECHHUB-2026-M8W2" });
+        return RedirectToAction(nameof(RegisterStaff), new { code = code });
     }
 
     [HttpGet]
@@ -283,19 +283,6 @@ public class AccountController : Controller
         {
             var clean = code.Trim().ToUpper();
             var token = await _db.SystemInviteTokens.FirstOrDefaultAsync(t => t.Token.ToUpper() == clean);
-            if (token == null && clean.StartsWith("ADMIN"))
-            {
-                token = new SystemInviteToken
-                {
-                    Token = clean,
-                    TargetRole = UserRole.Admin,
-                    Note = "Мастер-инвайт для регистрации Администратора системы TechHub",
-                    CreatedAt = DateTime.UtcNow,
-                    IsUsed = false
-                };
-                _db.SystemInviteTokens.Add(token);
-                await _db.SaveChangesAsync();
-            }
 
             if (token != null)
             {
@@ -345,19 +332,6 @@ public class AccountController : Controller
 
         var clean = model.InviteCode?.Trim().ToUpper() ?? "";
         var token = await _db.SystemInviteTokens.FirstOrDefaultAsync(t => t.Token.ToUpper() == clean);
-        if (token == null && clean.StartsWith("ADMIN"))
-        {
-            token = new SystemInviteToken
-            {
-                Token = clean,
-                TargetRole = UserRole.Admin,
-                Note = "Мастер-инвайт для регистрации Администратора системы TechHub",
-                CreatedAt = DateTime.UtcNow,
-                IsUsed = false
-            };
-            _db.SystemInviteTokens.Add(token);
-            await _db.SaveChangesAsync();
-        }
 
         if (token == null)
         {

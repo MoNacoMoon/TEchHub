@@ -101,24 +101,15 @@ public static class DbInitializer
             await context.SaveChangesAsync();
         }
 
-        // Мастер-инвайты для регистрации преподавателей и доп. администраторов
-        var masterCodes = new[] { "ADMIN-TECHHUB-2026-M8W2", "ADMIN-TECHHUB-2026-X7K9" };
-        foreach (var code in masterCodes)
+        // Очищаем устаревшие системные мастер-инвайты (теперь администратор управляет инвайтами вручную)
+        var oldMasterTokens = await context.SystemInviteTokens
+            .Where(t => t.Token == "ADMIN-TECHHUB-2026-M8W2" || t.Token == "ADMIN-TECHHUB-2026-X7K9")
+            .ToListAsync();
+        if (oldMasterTokens.Any())
         {
-            var existingToken = await context.SystemInviteTokens.FirstOrDefaultAsync(t => t.Token == code);
-            if (existingToken == null)
-            {
-                context.SystemInviteTokens.Add(new SystemInviteToken
-                {
-                    Token = code,
-                    TargetRole = UserRole.Admin,
-                    Note = "Мастер-инвайт Администратора TechHub",
-                    CreatedAt = DateTime.UtcNow,
-                    IsUsed = false
-                });
-            }
+            context.SystemInviteTokens.RemoveRange(oldMasterTokens);
+            await context.SaveChangesAsync();
         }
-        await context.SaveChangesAsync();
 
         // Очищаем автоматически созданные пустые группы 111-415, чтобы они не восстанавливались после удаления пользователем
         var defaultGroupNames = (from course in Enumerable.Range(1, 4)
