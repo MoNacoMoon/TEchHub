@@ -28,6 +28,7 @@ public class AppDbContext : DbContext
     public DbSet<EventLog> EventLogs => Set<EventLog>();
     public DbSet<CourseAnnouncement> CourseAnnouncements => Set<CourseAnnouncement>();
     public DbSet<SystemInviteToken> SystemInviteTokens => Set<SystemInviteToken>();
+    public DbSet<StudentReportSubmission> StudentReportSubmissions => Set<StudentReportSubmission>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -181,5 +182,24 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(a => a.AuthorTeacherId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // StudentReportSubmission
+        modelBuilder.Entity<StudentReportSubmission>()
+            .HasOne(s => s.Lecture)
+            .WithMany(l => l.ReportSubmissions)
+            .HasForeignKey(s => s.LectureId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<StudentReportSubmission>()
+            .HasOne(s => s.Student)
+            .WithMany(u => u.ReportSubmissions)
+            .HasForeignKey(s => s.StudentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<StudentReportSubmission>()
+            .HasOne(s => s.ReviewedByTeacher)
+            .WithMany()
+            .HasForeignKey(s => s.ReviewedByTeacherId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

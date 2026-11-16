@@ -269,6 +269,11 @@ public class StudentController : Controller
         var prog = await _lectureAccessService.GetDisciplineProgressAsync(studentId, id);
         var statusDict = prog.Lectures.ToDictionary(l => l.LectureId);
 
+        var allDisciplineLectureIds = discipline.Topics.SelectMany(t => t.Lectures.Select(l => l.Id)).ToList();
+        var studentReports = await _db.StudentReportSubmissions
+            .Where(r => r.StudentId == studentId && allDisciplineLectureIds.Contains(r.LectureId))
+            .ToDictionaryAsync(r => r.LectureId);
+
         var model = new DisciplineStudyViewModel
         {
             DisciplineId = discipline.Id,
@@ -294,6 +299,7 @@ public class StudentController : Controller
             foreach (var l in t.Lectures.OrderBy(l => l.OrderIndex))
             {
                 statusDict.TryGetValue(l.Id, out var stat);
+                studentReports.TryGetValue(l.Id, out var rep);
 
                 topicVm.Lectures.Add(new LectureItemViewModel
                 {
@@ -304,6 +310,9 @@ public class StudentController : Controller
                     HasAttachment = !string.IsNullOrEmpty(l.AttachmentFilePath),
                     HasTest = l.Test != null && l.Test.IsActive,
                     HasControlQuestions = l.ControlQuestions.Any(),
+                    RequiresReportSubmission = l.RequiresReportSubmission,
+                    IsReportApproved = stat?.IsReportApproved ?? false,
+                    ReportStatus = rep?.Status,
                     IsCompleted = stat?.Status == LectureAccessStatus.Completed,
                     BestTestScore = stat?.BestTestScore,
                     IsManuallyUnlocked = stat?.IsManuallyUnlocked ?? false
@@ -449,6 +458,34 @@ public class StudentController : Controller
             .Where(a => a.StudentId == studentId && cqIds.Contains(a.ControlQuestionId))
             .ToDictionaryAsync(a => a.ControlQuestionId);
 
+        StudentReportSubmissionDto? reportSubmissionDto = null;
+        if (lecture.RequiresReportSubmission)
+        {
+            var submission = await _db.StudentReportSubmissions
+                .Include(s => s.ReviewedByTeacher)
+                .Where(s => s.LectureId == id && s.StudentId == studentId)
+                .OrderByDescending(s => s.SubmittedAt)
+                .FirstOrDefaultAsync();
+
+            if (submission != null)
+            {
+                reportSubmissionDto = new StudentReportSubmissionDto
+                {
+                    Id = submission.Id,
+                    LectureId = submission.LectureId,
+                    OriginalFileName = submission.OriginalFileName,
+                    FileSizeBytes = submission.FileSizeBytes,
+                    StudentComment = submission.StudentComment,
+                    SubmittedAt = submission.SubmittedAt,
+                    Status = submission.Status,
+                    Grade = submission.Grade,
+                    TeacherFeedback = submission.TeacherFeedback,
+                    ReviewedAt = submission.ReviewedAt,
+                    ReviewedByTeacherName = submission.ReviewedByTeacher?.FullName
+                };
+            }
+        }
+
         var model = new LectureStudyViewModel
         {
             Id = lecture.Id,
@@ -463,6 +500,12 @@ public class StudentController : Controller
             AttachmentContentType = lecture.AttachmentContentType,
             OrderIndex = lecture.OrderIndex,
             RequiresManualReview = lecture.RequiresManualReview,
+            RequiresReportSubmission = lecture.RequiresReportSubmission,
+            ReportInstructions = lecture.ReportInstructions,
+            MaxReportScore = lecture.MaxReportScore,
+            IsReportApproved = progress.IsReportApproved,
+            ReportGrade = progress.ReportGrade,
+            CurrentReportSubmission = reportSubmissionDto,
             IsCompleted = progress.IsCompleted,
             IsControlQuestionsPassed = progress.IsControlQuestionsPassed,
             IsTestPassed = progress.IsTestPassed,
@@ -574,6 +617,159 @@ public class StudentController : Controller
         var fileName = lecture.AttachmentOriginalName ?? Path.GetFileName(fullPath);
 
         return PhysicalFile(fullPath, contentType, fileName);
+    }
+
+    // Отправка отчета студентом (Лабораторная / Практическая работа)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> SubmitReport(int lectureId, IFormFile? reportFile, string? studentComment)
+    {
+        int studentId = GetCurrentStudentId();
+        bool canAccess = await _lectureAccessService.CanStudentAccessLectureAsync(studentId, lectureId);
+        if (!canAccess)
+        {
+            TempData["ErrorMessage"] = "У вас нет доступа к этой лекции!";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var lecture = await _db.Lectures.Include(l => l.Topic).FirstOrDefaultAsync(l => l.Id == lectureId);
+        if (lecture == null || !lecture.RequiresReportSubmission)
+        {
+            TempData["ErrorMessage"] = "Для данной лекции не требуется сдача отчёта.";
+            return RedirectToAction(nameof(Lecture), new { id = lectureId });
+        }
+
+        if (reportFile == null || reportFile.Length == 0)
+        {
+            TempData["ErrorMessage"] = "Пожалуйста, выберите файл отчёта для отправки.";
+            return RedirectToAction(nameof(Lecture), new { id = lectureId });
+        }
+
+        // Максимальный размер 50 МБ
+        const long maxSizeBytes = 50 * 1024 * 1024;
+        if (reportFile.Length > maxSizeBytes)
+        {
+            TempData["ErrorMessage"] = "Размер файла превышает допустимый предел 50 МБ.";
+            return RedirectToAction(nameof(Lecture), new { id = lectureId });
+        }
+
+        var ext = Path.GetExtension(reportFile.FileName).ToLowerInvariant();
+        var forbiddenExts = new[] { ".exe", ".bat", ".cmd", ".sh", ".com", ".msi", ".dll", ".so", ".scr", ".pif", ".vbs", ".js", ".php", ".asp", ".aspx" };
+        if (forbiddenExts.Contains(ext))
+        {
+            TempData["ErrorMessage"] = $"Загрузка исполняемых файлов ({ext}) запрещена правилами безопасности.";
+            return RedirectToAction(nameof(Lecture), new { id = lectureId });
+        }
+
+        var uploadsReportsDir = Path.Combine(_env.WebRootPath, "uploads", "reports");
+        if (!Directory.Exists(uploadsReportsDir))
+        {
+            Directory.CreateDirectory(uploadsReportsDir);
+        }
+
+        var originalName = Path.GetFileName(reportFile.FileName);
+        var uniqueFileName = $"rep_{Guid.NewGuid():N}_{originalName}";
+        var fullPath = Path.Combine(uploadsReportsDir, uniqueFileName);
+
+        using (var stream = new FileStream(fullPath, FileMode.Create))
+        {
+            await reportFile.CopyToAsync(stream);
+        }
+
+        // Если запущено на постоянном томе Amvera (/data)
+        if (Directory.Exists("/data"))
+        {
+            try
+            {
+                var persistentDir = "/data/uploads/reports";
+                if (!Directory.Exists(persistentDir)) Directory.CreateDirectory(persistentDir);
+                var pPath = Path.Combine(persistentDir, uniqueFileName);
+                System.IO.File.Copy(fullPath, pPath, true);
+            }
+            catch { }
+        }
+
+        var existingSubmission = await _db.StudentReportSubmissions
+            .FirstOrDefaultAsync(s => s.LectureId == lectureId && s.StudentId == studentId);
+
+        if (existingSubmission == null)
+        {
+            existingSubmission = new StudentReportSubmission
+            {
+                LectureId = lectureId,
+                StudentId = studentId,
+                FilePath = $"/uploads/reports/{uniqueFileName}",
+                OriginalFileName = originalName,
+                FileSizeBytes = reportFile.Length,
+                ContentType = reportFile.ContentType,
+                StudentComment = studentComment?.Trim(),
+                SubmittedAt = DateTime.UtcNow,
+                Status = ReportSubmissionStatus.Pending
+            };
+            _db.StudentReportSubmissions.Add(existingSubmission);
+        }
+        else
+        {
+            existingSubmission.FilePath = $"/uploads/reports/{uniqueFileName}";
+            existingSubmission.OriginalFileName = originalName;
+            existingSubmission.FileSizeBytes = reportFile.Length;
+            existingSubmission.ContentType = reportFile.ContentType;
+            existingSubmission.StudentComment = studentComment?.Trim();
+            existingSubmission.SubmittedAt = DateTime.UtcNow;
+            existingSubmission.Status = ReportSubmissionStatus.Pending;
+            existingSubmission.Grade = null;
+            existingSubmission.TeacherFeedback = null;
+            existingSubmission.ReviewedAt = null;
+            existingSubmission.ReviewedByTeacherId = null;
+        }
+
+        await _db.SaveChangesAsync();
+
+        // Обновляем прогресс
+        await _lectureAccessService.UpdateLectureCompletionStatusAsync(studentId, lectureId);
+
+        var student = await _db.Users.FindAsync(studentId);
+        await _eventLogger.LogActionAsync(
+            studentId,
+            "REPORT_SUBMITTED",
+            $"Студент '{student?.FullName}' отправил отчет по лекции '{lecture.Title}' ({originalName}, {reportFile.Length / 1024} КБ)",
+            student?.FullName,
+            lecture.Title,
+            HttpContext.Connection.RemoteIpAddress?.ToString()
+        );
+
+        TempData["SuccessMessage"] = "Отчёт успешно загружен и отправлен преподавателю на проверку!";
+        return RedirectToAction(nameof(Lecture), new { id = lectureId });
+    }
+
+    // Скачивание своего отчета студентом
+    [HttpGet]
+    public async Task<IActionResult> DownloadReport(int id)
+    {
+        int studentId = GetCurrentStudentId();
+        var submission = await _db.StudentReportSubmissions
+            .Include(s => s.Lecture)
+            .FirstOrDefaultAsync(s => s.Id == id);
+
+        if (submission == null) return NotFound("Отчёт не найден");
+        if (submission.StudentId != studentId) return Forbid();
+
+        string relativePath = submission.FilePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        string filePath = Path.Combine(_env.WebRootPath, relativePath);
+
+        if (!System.IO.File.Exists(filePath) && Directory.Exists("/data"))
+        {
+            string pPath = Path.Combine("/data", relativePath);
+            if (System.IO.File.Exists(pPath)) filePath = pPath;
+        }
+
+        if (!System.IO.File.Exists(filePath))
+        {
+            return NotFound("Файл отчёта не найден на сервере");
+        }
+
+        var contentType = submission.ContentType ?? "application/octet-stream";
+        return PhysicalFile(filePath, contentType, submission.OriginalFileName);
     }
 
     // Отправка ответа на контрольный вопрос (AJAX / POST)

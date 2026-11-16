@@ -17,6 +17,9 @@ public class LectureStatusInfo
     public bool IsControlQuestionsPassed { get; set; }
     public bool IsTestPassed { get; set; }
     public bool IsManuallyUnlocked { get; set; }
+    public bool RequiresReportSubmission { get; set; }
+    public bool IsReportApproved { get; set; }
+    public int? ReportGrade { get; set; }
     public int? BestTestScore { get; set; }
     public int TestAttemptsCount { get; set; }
     public int MaxTestAttempts { get; set; }

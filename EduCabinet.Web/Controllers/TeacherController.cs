@@ -476,7 +476,9 @@ public class TeacherController : Controller
             TopicTitle = topic.Title,
             DisciplineId = topic.DisciplineId,
             OrderIndex = maxOrder + 1,
-            RequiresManualReview = true
+            RequiresManualReview = true,
+            RequiresReportSubmission = false,
+            MaxReportScore = 100
         };
         return View(model);
     }
@@ -495,6 +497,9 @@ public class TeacherController : Controller
             ContentHtml = model.ContentHtml,
             OrderIndex = model.OrderIndex,
             RequiresManualReview = model.RequiresManualReview,
+            RequiresReportSubmission = model.RequiresReportSubmission,
+            ReportInstructions = model.ReportInstructions?.Trim(),
+            MaxReportScore = model.MaxReportScore,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -574,6 +579,9 @@ public class TeacherController : Controller
             ContentHtml = lecture.ContentHtml,
             OrderIndex = lecture.OrderIndex,
             RequiresManualReview = lecture.RequiresManualReview,
+            RequiresReportSubmission = lecture.RequiresReportSubmission,
+            ReportInstructions = lecture.ReportInstructions,
+            MaxReportScore = lecture.MaxReportScore,
             ExistingAttachmentName = lecture.AttachmentOriginalName,
             ExistingAttachmentPath = lecture.AttachmentFilePath
         };
@@ -595,6 +603,9 @@ public class TeacherController : Controller
         lecture.ContentHtml = model.ContentHtml;
         lecture.OrderIndex = model.OrderIndex;
         lecture.RequiresManualReview = model.RequiresManualReview;
+        lecture.RequiresReportSubmission = model.RequiresReportSubmission;
+        lecture.ReportInstructions = model.ReportInstructions?.Trim();
+        lecture.MaxReportScore = model.MaxReportScore;
         lecture.UpdatedAt = DateTime.UtcNow;
 
         // Если загружен новый файл для замены
@@ -1208,6 +1219,180 @@ public class TeacherController : Controller
 
         TempData["SuccessMessage"] = $"Ответ студента {answer.Student.FullName} проверен ({(model.IsCorrect ? "Зачтено" : "Отправлено на доработку")})";
         return RedirectToAction(nameof(ManualReviews));
+    }
+
+    // ==========================================
+    // ПРОВЕРКА ОТЧЕТОВ СТУДЕНТОВ
+    // ==========================================
+
+    [HttpGet]
+    public async Task<IActionResult> StudentReports(int? disciplineId, int? groupId, ReportSubmissionStatus? status, string? search)
+    {
+        var disciplines = await _db.Disciplines.OrderBy(d => d.Title).ToListAsync();
+        var groups = await _db.StudentGroups.OrderBy(g => g.Name).ToListAsync();
+
+        var query = _db.StudentReportSubmissions
+            .Include(r => r.Student)
+                .ThenInclude(s => s.GroupMemberships)
+                    .ThenInclude(gm => gm.Group)
+            .Include(r => r.Lecture)
+                .ThenInclude(l => l.Topic)
+                    .ThenInclude(t => t.Discipline)
+            .Include(r => r.ReviewedByTeacher)
+            .AsQueryable();
+
+        if (disciplineId.HasValue && disciplineId.Value > 0)
+        {
+            query = query.Where(r => r.Lecture.Topic.DisciplineId == disciplineId.Value);
+        }
+
+        if (groupId.HasValue && groupId.Value > 0)
+        {
+            query = query.Where(r => r.Student.GroupMemberships.Any(gm => gm.GroupId == groupId.Value));
+        }
+
+        if (status.HasValue)
+        {
+            query = query.Where(r => r.Status == status.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var searchLower = search.Trim().ToLower();
+            query = query.Where(r => r.Student.FullName.ToLower().Contains(searchLower) ||
+                                     r.Student.Username.ToLower().Contains(searchLower) ||
+                                     r.OriginalFileName.ToLower().Contains(searchLower) ||
+                                     r.Lecture.Title.ToLower().Contains(searchLower));
+        }
+
+        var reports = await query
+            .OrderByDescending(r => r.SubmittedAt)
+            .ToListAsync();
+
+        var allQuery = _db.StudentReportSubmissions.AsQueryable();
+        if (disciplineId.HasValue && disciplineId.Value > 0)
+        {
+            allQuery = allQuery.Where(r => r.Lecture.Topic.DisciplineId == disciplineId.Value);
+        }
+        if (groupId.HasValue && groupId.Value > 0)
+        {
+            allQuery = allQuery.Where(r => r.Student.GroupMemberships.Any(gm => gm.GroupId == groupId.Value));
+        }
+
+        var counts = await allQuery
+            .GroupBy(r => r.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        var vm = new TeacherReportsViewModel
+        {
+            SelectedDisciplineId = disciplineId,
+            SelectedGroupId = groupId,
+            SelectedStatus = status,
+            SearchQuery = search,
+            Disciplines = disciplines,
+            Groups = groups,
+            TotalCount = counts.Sum(c => c.Count),
+            PendingCount = counts.FirstOrDefault(c => c.Status == ReportSubmissionStatus.Pending)?.Count ?? 0,
+            ApprovedCount = counts.FirstOrDefault(c => c.Status == ReportSubmissionStatus.Approved)?.Count ?? 0,
+            NeedsRevisionCount = counts.FirstOrDefault(c => c.Status == ReportSubmissionStatus.NeedsRevision)?.Count ?? 0,
+            RejectedCount = counts.FirstOrDefault(c => c.Status == ReportSubmissionStatus.Rejected)?.Count ?? 0,
+            Reports = reports.Select(r => new TeacherReportItemViewModel
+            {
+                Id = r.Id,
+                LectureId = r.LectureId,
+                LectureTitle = r.Lecture.Title,
+                DisciplineId = r.Lecture.Topic.DisciplineId,
+                DisciplineTitle = r.Lecture.Topic.Discipline.Title,
+                StudentId = r.StudentId,
+                StudentFullName = r.Student.FullName,
+                StudentGroupName = r.Student.GroupMemberships.FirstOrDefault()?.Group.Name ?? "Без группы",
+                OriginalFileName = r.OriginalFileName,
+                FileSizeBytes = r.FileSizeBytes,
+                StudentComment = r.StudentComment,
+                SubmittedAt = r.SubmittedAt,
+                Status = r.Status,
+                Grade = r.Grade,
+                MaxScore = r.Lecture.MaxReportScore ?? 100,
+                TeacherFeedback = r.TeacherFeedback,
+                ReviewedAt = r.ReviewedAt,
+                ReviewedByTeacherName = r.ReviewedByTeacher?.FullName
+            }).ToList()
+        };
+
+        return View(vm);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> GradeReport(GradeReportInputModel model)
+    {
+        var report = await _db.StudentReportSubmissions
+            .Include(r => r.Student)
+            .Include(r => r.Lecture)
+            .FirstOrDefaultAsync(r => r.Id == model.ReportId);
+
+        if (report == null) return NotFound("Отчёт не найден");
+
+        int teacherId = GetCurrentUserId();
+        var teacher = await _db.Users.FindAsync(teacherId);
+
+        report.Status = model.Status;
+        report.Grade = model.Grade;
+        report.TeacherFeedback = model.TeacherFeedback?.Trim();
+        report.ReviewedAt = DateTime.UtcNow;
+        report.ReviewedByTeacherId = teacherId;
+
+        await _db.SaveChangesAsync();
+
+        // Пересчитываем статус завершения лекции для студента
+        await _lectureAccessService.UpdateLectureCompletionStatusAsync(report.StudentId, report.LectureId);
+
+        string statusLabel = model.Status switch
+        {
+            ReportSubmissionStatus.Approved => "ЗАЧТЕНО",
+            ReportSubmissionStatus.NeedsRevision => "НА ДОРАБОТКУ",
+            ReportSubmissionStatus.Rejected => "НЕ ЗАЧТЕНО",
+            _ => "НА ПРОВЕРКЕ"
+        };
+
+        await _eventLogger.LogActionAsync(
+            teacherId,
+            "REPORT_GRADED",
+            $"Преподаватель {teacher?.FullName} проверил отчет студента {report.Student.FullName} по лекции '{report.Lecture.Title}'. Результат: {statusLabel}. Балл: {report.Grade ?? 0}/{report.Lecture.MaxReportScore ?? 100}. Замечания: {report.TeacherFeedback ?? "нет"}",
+            report.Student.FullName,
+            report.Lecture.Title,
+            HttpContext.Connection.RemoteIpAddress?.ToString()
+        );
+
+        TempData["SuccessMessage"] = $"Отчёт студента {report.Student.FullName} проверен (статус: {statusLabel})";
+        return RedirectToAction(nameof(StudentReports));
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DownloadStudentReport(int id)
+    {
+        var report = await _db.StudentReportSubmissions
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        if (report == null) return NotFound("Отчёт не найден");
+
+        string relativePath = report.FilePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        string filePath = Path.Combine(_env.WebRootPath, relativePath);
+
+        if (!System.IO.File.Exists(filePath) && Directory.Exists("/data"))
+        {
+            string pPath = Path.Combine("/data", relativePath);
+            if (System.IO.File.Exists(pPath)) filePath = pPath;
+        }
+
+        if (!System.IO.File.Exists(filePath))
+        {
+            return NotFound("Файл отчёта не найден на диске");
+        }
+
+        var contentType = report.ContentType ?? "application/octet-stream";
+        return PhysicalFile(filePath, contentType, report.OriginalFileName);
     }
 
     // ==========================================

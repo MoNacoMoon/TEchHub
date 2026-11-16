@@ -145,6 +145,9 @@ public class LectureAccessService : ILectureAccessService
                 IsControlQuestionsPassed = prog?.IsControlQuestionsPassed ?? false,
                 IsTestPassed = prog?.IsTestPassed ?? false,
                 IsManuallyUnlocked = prog?.IsManuallyUnlocked ?? false,
+                RequiresReportSubmission = lec.RequiresReportSubmission,
+                IsReportApproved = prog?.IsReportApproved ?? false,
+                ReportGrade = prog?.ReportGrade,
                 BestTestScore = testInfo?.BestScore,
                 TestAttemptsCount = testInfo?.AttemptsCount ?? 0,
                 MaxTestAttempts = lec.Test?.MaxAttempts ?? 0
@@ -259,9 +262,27 @@ public class LectureAccessService : ILectureAccessService
         }
         progress.IsTestPassed = testPassed;
 
-        // 3. Итоговое завершение лекции
+        // 3. Проверяем сдачу отчета
+        bool reportApproved = true;
+        if (lecture.RequiresReportSubmission)
+        {
+            var approvedSubmission = await _db.StudentReportSubmissions
+                .Where(s => s.LectureId == lectureId && s.StudentId == studentId && s.Status == ReportSubmissionStatus.Approved)
+                .OrderByDescending(s => s.ReviewedAt ?? s.SubmittedAt)
+                .FirstOrDefaultAsync();
+
+            reportApproved = (approvedSubmission != null);
+            progress.IsReportApproved = reportApproved;
+            progress.ReportGrade = approvedSubmission?.Grade;
+        }
+        else
+        {
+            progress.IsReportApproved = true;
+        }
+
+        // 4. Итоговое завершение лекции
         bool wasCompleted = progress.IsCompleted;
-        progress.IsCompleted = progress.IsControlQuestionsPassed && progress.IsTestPassed;
+        progress.IsCompleted = progress.IsControlQuestionsPassed && progress.IsTestPassed && progress.IsReportApproved;
 
         if (progress.IsCompleted && !wasCompleted)
         {

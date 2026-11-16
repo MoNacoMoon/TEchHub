@@ -52,6 +52,7 @@
                         {
                             <a class="top-nav-link" asp-controller="Teacher" asp-action="Index">Панель</a>
                             <a class="top-nav-link" asp-controller="Teacher" asp-action="Disciplines">Дисциплины</a>
+                            <a class="top-nav-link" asp-controller="Teacher" asp-action="StudentReports">Отчёты</a>
                             <a class="top-nav-link" asp-controller="Teacher" asp-action="ManualReviews">Проверка</a>
                             <a class="top-nav-link" asp-controller="Teacher" asp-action="Reports">Журнал</a>
                             <a class="top-nav-link" asp-controller="Teacher" asp-action="Students">Студенты</a>
@@ -267,6 +268,10 @@
                             <a class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-2 px-3" asp-controller="Teacher" asp-action="Reports">
                                 <i class="bi bi-file-earmark-spreadsheet text-info fs-5"></i>
                                 <span>Сводный журнал</span>
+                            </a>
+                            <a class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-2 px-3" asp-controller="Teacher" asp-action="StudentReports">
+                                <i class="bi bi-folder-check text-primary fs-5"></i>
+                                <span>Проверка отчётов студентов</span>
                             </a>
                             <a class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-2 px-3" asp-controller="Teacher" asp-action="ManualReviews">
                                 <i class="bi bi-check2-square text-warning fs-5"></i>

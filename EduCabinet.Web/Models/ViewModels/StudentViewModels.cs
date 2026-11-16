@@ -141,6 +141,9 @@ public class LectureItemViewModel
     public bool HasAttachment { get; set; }
     public bool HasTest { get; set; }
     public bool HasControlQuestions { get; set; }
+    public bool RequiresReportSubmission { get; set; }
+    public bool IsReportApproved { get; set; }
+    public ReportSubmissionStatus? ReportStatus { get; set; }
     public bool IsCompleted { get; set; }
     public int? BestTestScore { get; set; }
     public bool IsManuallyUnlocked { get; set; }
@@ -161,6 +164,13 @@ public class LectureStudyViewModel
     public int OrderIndex { get; set; }
     public bool RequiresManualReview { get; set; }
 
+    public bool RequiresReportSubmission { get; set; }
+    public string? ReportInstructions { get; set; }
+    public int? MaxReportScore { get; set; }
+    public bool IsReportApproved { get; set; }
+    public int? ReportGrade { get; set; }
+    public StudentReportSubmissionDto? CurrentReportSubmission { get; set; }
+
     public bool IsCompleted { get; set; }
     public bool IsControlQuestionsPassed { get; set; }
     public bool IsTestPassed { get; set; }
@@ -171,6 +181,21 @@ public class LectureStudyViewModel
 
     public List<ControlQuestionStudyDto> ControlQuestions { get; set; } = new();
     public TestSummaryDto? TestSummary { get; set; }
+}
+
+public class StudentReportSubmissionDto
+{
+    public int Id { get; set; }
+    public int LectureId { get; set; }
+    public string OriginalFileName { get; set; } = string.Empty;
+    public long FileSizeBytes { get; set; }
+    public string? StudentComment { get; set; }
+    public DateTime SubmittedAt { get; set; }
+    public ReportSubmissionStatus Status { get; set; }
+    public int? Grade { get; set; }
+    public string? TeacherFeedback { get; set; }
+    public DateTime? ReviewedAt { get; set; }
+    public string? ReviewedByTeacherName { get; set; }
 }
 
 public class ControlQuestionStudyDto

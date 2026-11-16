@@ -32,4 +32,5 @@ public class User
     public ICollection<LectureProgress> LectureProgresses { get; set; } = new List<LectureProgress>();
     public ICollection<TestAttempt> TestAttempts { get; set; } = new List<TestAttempt>();
     public ICollection<StudentControlAnswer> ControlAnswers { get; set; } = new List<StudentControlAnswer>();
+    public ICollection<StudentReportSubmission> ReportSubmissions { get; set; } = new List<StudentReportSubmission>();
 }

@@ -191,6 +191,16 @@ public class LectureEditViewModel
     [Display(Name = "Требовать обязательную ручную проверку развёрнутых ответов до открытия следующей лекции")]
     public bool RequiresManualReview { get; set; } = true;
 
+    [Display(Name = "Требовать сдачу отчёта/файла студентом")]
+    public bool RequiresReportSubmission { get; set; } = false;
+
+    [Display(Name = "Инструкции и требования к отчету")]
+    public string? ReportInstructions { get; set; }
+
+    [Display(Name = "Максимальный балл за отчет")]
+    [Range(1, 1000, ErrorMessage = "Максимальный балл должен быть от 1 до 1000")]
+    public int? MaxReportScore { get; set; } = 100;
+
     [Display(Name = "Файл материала (PDF, DOCX и др.)")]
     public IFormFile? AttachmentFile { get; set; }
 
@@ -341,4 +351,59 @@ public class StudentAttemptHistoryDto
     public int ScorePercent { get; set; }
     public bool IsPassed { get; set; }
     public DateTime? CompletedAt { get; set; }
+}
+
+public class TeacherReportsViewModel
+{
+    public int? SelectedDisciplineId { get; set; }
+    public int? SelectedGroupId { get; set; }
+    public ReportSubmissionStatus? SelectedStatus { get; set; }
+    public string? SearchQuery { get; set; }
+
+    public List<Discipline> Disciplines { get; set; } = new();
+    public List<StudentGroup> Groups { get; set; } = new();
+    public List<TeacherReportItemViewModel> Reports { get; set; } = new();
+
+    public int TotalCount { get; set; }
+    public int PendingCount { get; set; }
+    public int ApprovedCount { get; set; }
+    public int NeedsRevisionCount { get; set; }
+    public int RejectedCount { get; set; }
+}
+
+public class TeacherReportItemViewModel
+{
+    public int Id { get; set; }
+    public int LectureId { get; set; }
+    public string LectureTitle { get; set; } = string.Empty;
+    public int DisciplineId { get; set; }
+    public string DisciplineTitle { get; set; } = string.Empty;
+    public int StudentId { get; set; }
+    public string StudentFullName { get; set; } = string.Empty;
+    public string StudentGroupName { get; set; } = string.Empty;
+    public string OriginalFileName { get; set; } = string.Empty;
+    public long FileSizeBytes { get; set; }
+    public string? StudentComment { get; set; }
+    public DateTime SubmittedAt { get; set; }
+    public ReportSubmissionStatus Status { get; set; }
+    public int? Grade { get; set; }
+    public int? MaxScore { get; set; }
+    public string? TeacherFeedback { get; set; }
+    public DateTime? ReviewedAt { get; set; }
+    public string? ReviewedByTeacherName { get; set; }
+}
+
+public class GradeReportInputModel
+{
+    [Required]
+    public int ReportId { get; set; }
+
+    [Required]
+    public ReportSubmissionStatus Status { get; set; }
+
+    [Range(0, 1000, ErrorMessage = "Балл должен быть от 0 до 1000")]
+    public int? Grade { get; set; }
+
+    [StringLength(1000, ErrorMessage = "Отзыв не должен превышать 1000 символов")]
+    public string? TeacherFeedback { get; set; }
 }

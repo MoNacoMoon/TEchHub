@@ -70,6 +70,34 @@
                         </label>
                     </div>
 
+                    <!-- Блок сдачи отчетов студентами -->
+                    <div class="mb-4 bg-light p-3 rounded border">
+                        <div class="form-check form-switch mb-2">
+                            <input asp-for="RequiresReportSubmission" class="form-check-input" type="checkbox" id="requiresReportSwitch" />
+                            <label class="form-check-label fw-bold text-dark" for="requiresReportSwitch">
+                                <i class="bi bi-file-earmark-arrow-up text-primary me-1"></i> Требовать сдачу отчёта / практической работы студентом
+                            </label>
+                        </div>
+                        <div class="text-muted small mb-3">
+                            Если включено, студент обязан прикрепить свой файл (лабораторная работа, отчет, проект) для проверки. Следующая лекция откроется только после того, как преподаватель поставит оценку и статус «Зачтено».
+                        </div>
+
+                        <div id="reportSettingsBlock" style="display: @(Model.RequiresReportSubmission ? "block" : "none");">
+                            <div class="row g-3">
+                                <div class="col-md-9">
+                                    <label asp-for="ReportInstructions" class="form-label fw-semibold">Инструкции и требования к отчету</label>
+                                    <textarea asp-for="ReportInstructions" class="form-control" rows="3" placeholder="Укажите задание для студента (например: прикрепить отчет в формате DOCX/PDF по ГОСТу, приложить расчеты или архив с кодом)..."></textarea>
+                                    <span asp-validation-for="ReportInstructions" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-3">
+                                    <label asp-for="MaxReportScore" class="form-label fw-semibold">Максимальный балл</label>
+                                    <input asp-for="MaxReportScore" type="number" class="form-control" min="1" max="1000" />
+                                    <span asp-validation-for="MaxReportScore" class="text-danger small"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="d-flex justify-content-between align-items-center border-top pt-3">
                         <a asp-action="LectureDetails" asp-route-id="@Model.Id" class="btn btn-outline-secondary">Отмена</a>
                         <button type="submit" class="btn btn-primary px-4">
@@ -81,3 +109,18 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const sw = document.getElementById('requiresReportSwitch');
+            const blk = document.getElementById('reportSettingsBlock');
+            if (sw && blk) {
+                sw.addEventListener('change', function () {
+                    blk.style.display = this.checked ? 'block' : 'none';
+                });
+            }
+        });
+    </script>
+}

@@ -30,6 +30,40 @@ public static class DbInitializer
         try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""TestQuestions"" ADD COLUMN ""ImageUrl"" TEXT NULL;"); } catch { }
         try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""TestQuestionOptions"" ADD COLUMN ""ImageUrl"" TEXT NULL;"); } catch { }
 
+        // Гарантируем наличие колонок сдачи отчетов студентами в Lectures и LectureProgresses
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Lectures"" ADD COLUMN ""RequiresReportSubmission"" INTEGER NOT NULL DEFAULT 0;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Lectures"" ADD COLUMN ""ReportInstructions"" TEXT NULL;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Lectures"" ADD COLUMN ""MaxReportScore"" INTEGER NULL DEFAULT 100;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""LectureProgresses"" ADD COLUMN ""IsReportApproved"" INTEGER NOT NULL DEFAULT 0;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""LectureProgresses"" ADD COLUMN ""ReportGrade"" INTEGER NULL;"); } catch { }
+
+        // Гарантируем наличие таблицы StudentReportSubmissions
+        try
+        {
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE IF NOT EXISTS ""StudentReportSubmissions"" (
+                    ""Id"" INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ""LectureId"" INTEGER NOT NULL,
+                    ""StudentId"" INTEGER NOT NULL,
+                    ""FilePath"" TEXT NOT NULL,
+                    ""OriginalFileName"" TEXT NOT NULL,
+                    ""FileSizeBytes"" INTEGER NOT NULL,
+                    ""ContentType"" TEXT NULL,
+                    ""StudentComment"" TEXT NULL,
+                    ""SubmittedAt"" TEXT NOT NULL,
+                    ""Status"" INTEGER NOT NULL DEFAULT 1,
+                    ""Grade"" INTEGER NULL,
+                    ""TeacherFeedback"" TEXT NULL,
+                    ""ReviewedAt"" TEXT NULL,
+                    ""ReviewedByTeacherId"" INTEGER NULL,
+                    CONSTRAINT ""FK_StudentReportSubmissions_Lectures_LectureId"" FOREIGN KEY (""LectureId"") REFERENCES ""Lectures"" (""Id"") ON DELETE CASCADE,
+                    CONSTRAINT ""FK_StudentReportSubmissions_Users_StudentId"" FOREIGN KEY (""StudentId"") REFERENCES ""Users"" (""Id"") ON DELETE CASCADE,
+                    CONSTRAINT ""FK_StudentReportSubmissions_Users_ReviewedByTeacherId"" FOREIGN KEY (""ReviewedByTeacherId"") REFERENCES ""Users"" (""Id"") ON DELETE SET NULL
+                );
+            ");
+        }
+        catch { }
+
         // Гарантируем наличие таблицы SystemInviteTokens
         try
         {
