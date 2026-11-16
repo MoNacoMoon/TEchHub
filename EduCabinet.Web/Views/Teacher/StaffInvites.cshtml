@@ -130,10 +130,22 @@
                                     }
                                 </div>
                             }
+                            else if (inv.ExpiresAt.HasValue && inv.ExpiresAt.Value < DateTime.UtcNow)
+                            {
+                                <div>
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle font-mono">
+                                        <i class="bi bi-x-circle me-1"></i>Истёк (5 мин)
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-outline-warning py-0 px-2 mt-1 d-block font-mono" style="font-size: 0.75rem;" onclick="refreshStaffToken(@inv.Id)">
+                                        <i class="bi bi-arrow-repeat me-1"></i>Продлить на 5 мин
+                                    </button>
+                                </div>
+                            }
                             else
                             {
+                                var remSec = inv.ExpiresAt.HasValue ? Math.Max(0, (int)(inv.ExpiresAt.Value - DateTime.UtcNow).TotalSeconds) : 300;
                                 <span class="badge bg-success-subtle text-success border border-success-subtle font-mono">
-                                    <i class="bi bi-hourglass-split me-1"></i>Активен (готов к регистрации)
+                                    <i class="bi bi-hourglass-split me-1"></i>Активен: @($"{(remSec / 60):D2}:{(remSec % 60):D2}")
                                 </span>
                             }
                         </td>
@@ -193,14 +205,14 @@
                     </div>
 
                     <div class="p-3 bg-body-tertiary rounded-3 border small text-muted">
-                        <i class="bi bi-info-circle text-primary me-1"></i>
-                        После создания система сформирует уникальный код вида <code class="font-mono">TEACH-TECHHUB-XXXXXX</code> и прямую ссылку для регистрации.
+                        <i class="bi bi-shield-lock-fill text-warning me-1"></i>
+                        Инвайт-код формируется с криптографической стойкостью и действует <strong>ровно 5 минут</strong> для защиты платформы от перехвата и подбора. Преподаватель должен активировать его в течение этого времени (при необходимости администратор может продлить код).
                     </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Отмена</button>
                     <button type="submit" class="btn btn-primary btn-sm">
-                        <i class="bi bi-check-circle-fill me-1"></i> Сгенерировать инвайт
+                        <i class="bi bi-check-circle-fill me-1"></i> Сгенерировать инвайт (на 5 мин)
                     </button>
                 </div>
             </form>
@@ -212,9 +224,43 @@
     <script>
         function copyText(text, successMsg) {
             navigator.clipboard.writeText(text).then(function() {
-                alert(successMsg || 'Скопировано в буфер обмена!');
+                if (typeof showToast === 'function') {
+                    showToast(successMsg || 'Скопировано в буфер обмена!', 'success');
+                } else {
+                    alert(successMsg || 'Скопировано в буфер обмена!');
+                }
             }).catch(function() {
                 prompt('Скопируйте вручную:', text);
+            });
+        }
+
+        function refreshStaffToken(id) {
+            const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+            const token = tokenInput ? tokenInput.value : '';
+
+            fetch(`/Teacher/RefreshStaffInvite?id=${id}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': token
+                },
+                body: `__RequestVerificationToken=${encodeURIComponent(token)}&id=${id}`
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    if (typeof showToast === 'function') {
+                        showToast(data.message, 'success');
+                    } else {
+                        alert(data.message);
+                    }
+                    setTimeout(() => location.reload(), 800);
+                } else {
+                    alert(data.message || 'Ошибка продления инвайта');
+                }
+            })
+            .catch(() => {
+                alert('Не удалось продлить инвайт. Проверьте соединение.');
             });
         }
     </script>

@@ -97,7 +97,76 @@ builder.Services.AddRateLimiter(options =>
         opt.Window = TimeSpan.FromMinutes(1);
         opt.QueueLimit = 0;
     });
+
+    // Ограничитель регистрации: строго максимум 3 попытки на 1 IP за 15 минут (защита от перебора инвайтов и спама)
+    options.AddPolicy("register", httpContext =>
+    {
+        var forwarded = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        var clientIp = !string.IsNullOrWhiteSpace(forwarded)
+            ? forwarded.Split(',')[0].Trim()
+            : (httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+
+        return RateLimitPartition.GetFixedWindowLimiter($"reg_{clientIp}", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 3,
+            Window = TimeSpan.FromMinutes(15),
+            QueueLimit = 0
+        });
+    });
+
+    // Защита от резких одновременных всплесков (Concurrency Burst Guard): до 100 одновременных запросов в обработке
+    options.AddConcurrencyLimiter("burst_guard", opt =>
+    {
+        opt.PermitLimit = 100;
+        opt.QueueLimit = 150;
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+    });
+
+    // Реакция на блокировку спама/флуда: фиксация в журнале аудита EventLogs и ответ 429
+    options.OnRejected = async (context, token) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/json; charset=utf-8";
+
+        var clientIp = context.HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault()?.Split(',')[0].Trim();
+        if (string.IsNullOrEmpty(clientIp))
+        {
+            clientIp = context.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        }
+
+        var path = context.HttpContext.Request.Path.ToString();
+        var userIdClaim = context.HttpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        int.TryParse(userIdClaim, out int uid);
+        var userName = context.HttpContext.User.Identity?.Name ?? "Анонимный гость";
+
+        try
+        {
+            using var scope = context.HttpContext.RequestServices.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.EventLogs.Add(new EduCabinet.Web.Models.Entities.EventLog
+            {
+                UserId = uid > 0 ? uid : null,
+                Action = "RATE_LIMIT_BLOCKED",
+                Description = $"Защита от флуда: заблокирован спам запросов с IP {clientIp} на {path} (пользователь: {userName}). Выдан статус 429 Too Many Requests.",
+                TargetStudent = userName,
+                IpAddress = clientIp,
+                Timestamp = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync(token);
+        }
+        catch { }
+
+        await context.HttpContext.Response.WriteAsync(
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                error = "Too Many Requests",
+                message = "Превышен лимит частоты запросов. В целях безопасности доступ временно ограничен. Подождите 1 минуту."
+            }), token);
+    };
 });
+
+// Сервис защиты регистрации (лимит 3 попыток на IP с понятными русскими подсказками и блокировкой)
+builder.Services.AddSingleton<IRegistrationSecurityService, RegistrationSecurityService>();
 
 // Сервисы бизнес-логики
 builder.Services.AddScoped<IAuthService, AuthService>();

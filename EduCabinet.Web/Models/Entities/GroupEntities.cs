@@ -6,6 +6,8 @@ public class StudentGroup
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string InviteCode { get; set; } = string.Empty;
+    public DateTime? InviteCodeExpiresAt { get; set; }
+    public DateTime? InviteCodeGeneratedAt { get; set; }
     public int CourseNumber { get; set; } = 1;
     public int StudyDurationYears { get; set; } = 4;
     public int AdmissionYear { get; set; } = 2026;

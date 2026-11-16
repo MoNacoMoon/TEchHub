@@ -98,10 +98,24 @@
                             <span class="quiet-tag font-mono" title="Срок обучения специальности">
                                 <i class="bi bi-clock-history me-1"></i>@g.StudyDurationYears года
                             </span>
-                            <span class="quiet-tag font-mono text-primary fw-semibold" style="cursor: pointer;" onclick="copyGroupInviteCode('@g.InviteCode', '@g.GroupName')" title="Нажмите, чтобы скопировать только инвайт-код (@g.InviteCode)">
-                                <i class="bi bi-key-fill me-1"></i>@g.InviteCode
-                                <i class="bi bi-clipboard ms-1 text-muted" style="font-size: 0.75rem;"></i>
-                            </span>
+                            <div class="d-inline-flex align-items-center gap-1 flex-wrap">
+                                <span class="quiet-tag font-mono text-primary fw-semibold" id="invite-tag-@g.GroupId" data-code="@g.InviteCode" style="cursor: pointer;" onclick="copyGroupInviteCode(this.getAttribute('data-code'), '@g.GroupName')" title="Нажмите, чтобы скопировать только инвайт-код">
+                                    <i class="bi bi-key-fill me-1"></i><span class="code-text">@g.InviteCode</span>
+                                    <i class="bi bi-clipboard ms-1 text-muted" style="font-size: 0.75rem;"></i>
+                                </span>
+                                <span class="badge @(g.IsInviteExpired ? "bg-danger-subtle text-danger" : "bg-warning-subtle text-warning") font-mono small group-timer" 
+                                      id="timer-badge-@g.GroupId" 
+                                      data-group-id="@g.GroupId" 
+                                      data-seconds="@g.RemainingSeconds" 
+                                      title="Время действия инвайт-кода (5 минут)">
+                                    <i class="bi bi-clock me-1"></i><span class="timer-display">@(g.IsInviteExpired ? "Истёк" : $"{(g.RemainingSeconds / 60):D2}:{(g.RemainingSeconds % 60):D2}")</span>
+                                </span>
+                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 shadow-none" 
+                                        onclick="refreshGroupCode(@g.GroupId, '@g.GroupName')" 
+                                        title="Сгенерировать новый код на 5 минут">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                </button>
+                            </div>
                         </div>
                         @if (!string.IsNullOrEmpty(g.Description))
                         {
@@ -110,7 +124,8 @@
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <button type="button" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-1 shadow-none" 
-                                onclick="copyGroupInviteLink('@g.InviteCode', '@g.GroupName')" 
+                                id="link-btn-@g.GroupId"
+                                onclick="copyGroupInviteLink(document.getElementById('invite-tag-@g.GroupId').getAttribute('data-code'), '@g.GroupName')" 
                                 title="Скопировать ссылку-приглашение для студентов этой группы">
                             <i class="bi bi-link-45deg"></i>
                             <span>Инвайт-ссылка</span>
@@ -540,6 +555,72 @@
             if (badge) {
                 badge.textContent = clean ? `${clean}-XXXXXX` : 'Случайный токен';
             }
+        }
+
+        function formatMinutesSeconds(totalSeconds) {
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        }
+
+        setInterval(() => {
+            document.querySelectorAll('.group-timer').forEach(badge => {
+                let sec = parseInt(badge.getAttribute('data-seconds') || '0', 10);
+                const display = badge.querySelector('.timer-display');
+                if (sec > 0) {
+                    sec--;
+                    badge.setAttribute('data-seconds', String(sec));
+                    if (display) display.innerText = formatMinutesSeconds(sec);
+                    if (sec <= 0) {
+                        badge.classList.remove('bg-warning-subtle', 'text-warning');
+                        badge.classList.add('bg-danger-subtle', 'text-danger');
+                        if (display) display.innerText = 'Истёк';
+                    }
+                }
+            });
+        }, 1000);
+
+        function refreshGroupCode(groupId, groupName) {
+            const tokenInput = document.querySelector('input[name="__RequestVerificationToken"]');
+            const token = tokenInput ? tokenInput.value : '';
+
+            const badge = document.getElementById(`timer-badge-${groupId}`);
+            const display = badge ? badge.querySelector('.timer-display') : null;
+            if (display) display.innerText = '...';
+
+            fetch(`/Teacher/RefreshGroupInviteCode?groupId=${groupId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'RequestVerificationToken': token
+                },
+                body: `__RequestVerificationToken=${encodeURIComponent(token)}&groupId=${groupId}`
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const tag = document.getElementById(`invite-tag-${groupId}`);
+                    if (tag) {
+                        tag.setAttribute('data-code', data.inviteCode);
+                        const codeText = tag.querySelector('.code-text');
+                        if (codeText) codeText.innerText = data.inviteCode;
+                    }
+                    if (badge) {
+                        badge.setAttribute('data-seconds', String(data.remainingSeconds || 300));
+                        badge.classList.remove('bg-danger-subtle', 'text-danger');
+                        badge.classList.add('bg-warning-subtle', 'text-warning');
+                        if (display) display.innerText = formatMinutesSeconds(data.remainingSeconds || 300);
+                    }
+                    if (typeof showToast === 'function') {
+                        showToast(data.message, 'success');
+                    }
+                } else {
+                    alert(data.message || 'Ошибка обновления инвайт-кода');
+                }
+            })
+            .catch(() => {
+                alert('Не удалось обновить код. Проверьте соединение.');
+            });
         }
 
         document.addEventListener('DOMContentLoaded', function() {

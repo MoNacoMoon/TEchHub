@@ -13,6 +13,8 @@ public static class DbInitializer
 
         // Гарантируем наличие колонок в таблице StudentGroups
         try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""StudentGroups"" ADD COLUMN ""InviteCode"" TEXT NOT NULL DEFAULT '';"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""StudentGroups"" ADD COLUMN ""InviteCodeExpiresAt"" TEXT NULL;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""StudentGroups"" ADD COLUMN ""InviteCodeGeneratedAt"" TEXT NULL;"); } catch { }
         try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""StudentGroups"" ADD COLUMN ""CourseNumber"" INTEGER NOT NULL DEFAULT 1;"); } catch { }
         try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""StudentGroups"" ADD COLUMN ""StudyDurationYears"" INTEGER NOT NULL DEFAULT 4;"); } catch { }
         try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""StudentGroups"" ADD COLUMN ""AdmissionYear"" INTEGER NOT NULL DEFAULT 2026;"); } catch { }

@@ -17,19 +17,33 @@ public class AccountController : Controller
     private readonly IEventLogService _eventLogger;
     private readonly IEmailService _emailService;
     private readonly IWebHostEnvironment _env;
+    private readonly IRegistrationSecurityService _regSecurity;
 
     public AccountController(
         IAuthService authService, 
         AppDbContext db, 
         IEventLogService eventLogger,
         IEmailService emailService,
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        IRegistrationSecurityService regSecurity)
     {
         _authService = authService;
         _db = db;
         _eventLogger = eventLogger;
         _emailService = emailService;
         _env = env;
+        _regSecurity = regSecurity;
+    }
+
+    private string GetClientIp()
+    {
+        var forwarded = HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(forwarded))
+        {
+            var ip = forwarded.Split(',')[0].Trim();
+            if (!string.IsNullOrEmpty(ip)) return ip;
+        }
+        return HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
     }
 
     [HttpGet]
@@ -110,6 +124,18 @@ public class AccountController : Controller
         }
 
         var model = new RegisterViewModel();
+        var clientIp = GetClientIp();
+
+        if (_regSecurity.IsBlocked(clientIp, out int remaining, out var retryAfter))
+        {
+            model.IsIpBlocked = true;
+            model.RemainingAttempts = 0;
+            ModelState.AddModelError(string.Empty, $"Превышен лимит попыток регистрации (максимум 3 попытки с одного IP). Доступ временно заблокирован на {(int)Math.Ceiling(retryAfter?.TotalMinutes ?? 15)} мин.");
+        }
+        else
+        {
+            model.RemainingAttempts = remaining;
+        }
 
         if (!string.IsNullOrWhiteSpace(code))
         {
@@ -125,11 +151,23 @@ public class AccountController : Controller
                 g.InviteCode.ToUpper().Replace("-", "") == cleanRaw);
             if (group != null)
             {
-                model.InviteCode = group.InviteCode;
-                model.GroupId = group.Id;
-                model.GroupName = group.Name;
-                model.GroupDescription = group.Description;
-                model.IsCodeLocked = true;
+                if (group.InviteCodeExpiresAt.HasValue && group.InviteCodeExpiresAt.Value < DateTime.UtcNow)
+                {
+                    model.InviteCode = code.Trim();
+                    ModelState.AddModelError("InviteCode", "Срок действия инвайт-кода истек. Инвайт-коды действуют 5 минут в целях безопасности. Попросите преподавателя обновить код.");
+                }
+                else
+                {
+                    model.InviteCode = group.InviteCode;
+                    model.GroupId = group.Id;
+                    model.GroupName = group.Name;
+                    model.GroupDescription = group.Description;
+                    model.IsCodeLocked = true;
+                    if (group.InviteCodeExpiresAt.HasValue)
+                    {
+                        model.RemainingCodeSeconds = Math.Max(0, (int)(group.InviteCodeExpiresAt.Value - DateTime.UtcNow).TotalSeconds);
+                    }
+                }
             }
             else
             {
@@ -144,9 +182,22 @@ public class AccountController : Controller
     [HttpPost]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
-    [EnableRateLimiting("auth")]
+    [EnableRateLimiting("register")]
     public async Task<IActionResult> Register(RegisterViewModel model)
     {
+        var clientIp = GetClientIp();
+
+        if (_regSecurity.IsBlocked(clientIp, out int remainingAttempts, out var retryAfter))
+        {
+            model.IsIpBlocked = true;
+            model.RemainingAttempts = 0;
+            ModelState.AddModelError(string.Empty, $"Превышено максимальное количество попыток регистрации (3) с вашего IP-адреса. Доступ временно заблокирован на {(int)Math.Ceiling(retryAfter?.TotalMinutes ?? 15)} мин.");
+            return View(model);
+        }
+
+        int remaining = _regSecurity.RecordAttempt(clientIp);
+        model.RemainingAttempts = remaining;
+
         if (string.IsNullOrWhiteSpace(model.InviteCode))
         {
             ModelState.AddModelError("InviteCode", "Укажите инвайт-код вашей учебной группы.");
@@ -174,11 +225,20 @@ public class AccountController : Controller
             {
                 ModelState.AddModelError("InviteCode", "Недействительный код приглашения. Обратитесь к преподавателю за кодом вашей группы.");
             }
+            else if (group.InviteCodeExpiresAt.HasValue && group.InviteCodeExpiresAt.Value < DateTime.UtcNow)
+            {
+                ModelState.AddModelError("InviteCode", "Срок действия инвайт-кода истек. Инвайт-коды действуют ровно 5 минут в целях безопасности. Попросите преподавателя обновить код.");
+                group = null;
+            }
             else
             {
                 model.GroupId = group.Id;
                 model.GroupName = group.Name;
                 model.GroupDescription = group.Description;
+                if (group.InviteCodeExpiresAt.HasValue)
+                {
+                    model.RemainingCodeSeconds = Math.Max(0, (int)(group.InviteCodeExpiresAt.Value - DateTime.UtcNow).TotalSeconds);
+                }
             }
         }
 
@@ -278,6 +338,18 @@ public class AccountController : Controller
         }
 
         var model = new RegisterStaffViewModel();
+        var clientIp = GetClientIp();
+
+        if (_regSecurity.IsBlocked(clientIp, out int remaining, out var retryAfter))
+        {
+            model.IsIpBlocked = true;
+            model.RemainingAttempts = 0;
+            ModelState.AddModelError(string.Empty, $"Превышен лимит попыток регистрации (максимум 3 попытки с одного IP). Доступ временно заблокирован на {(int)Math.Ceiling(retryAfter?.TotalMinutes ?? 15)} мин.");
+        }
+        else
+        {
+            model.RemainingAttempts = remaining;
+        }
 
         if (!string.IsNullOrWhiteSpace(code))
         {
@@ -299,7 +371,7 @@ public class AccountController : Controller
                 }
                 else if (token.ExpiresAt.HasValue && token.ExpiresAt < DateTime.UtcNow)
                 {
-                    ModelState.AddModelError("InviteCode", "Срок действия этого инвайт-кода истек.");
+                    ModelState.AddModelError("InviteCode", "Срок действия этого инвайт-кода истек (инвайт-коды действуют 5 минут). Запросите новый код у Администратора.");
                 }
                 else
                 {
@@ -307,6 +379,10 @@ public class AccountController : Controller
                     model.TargetRole = token.TargetRole;
                     model.Note = token.Note;
                     model.IsCodeLocked = true;
+                    if (token.ExpiresAt.HasValue)
+                    {
+                        model.RemainingCodeSeconds = Math.Max(0, (int)(token.ExpiresAt.Value - DateTime.UtcNow).TotalSeconds);
+                    }
                 }
             }
             else
@@ -322,9 +398,22 @@ public class AccountController : Controller
     [HttpPost]
     [AllowAnonymous]
     [ValidateAntiForgeryToken]
-    [EnableRateLimiting("auth")]
+    [EnableRateLimiting("register")]
     public async Task<IActionResult> RegisterStaff(RegisterStaffViewModel model)
     {
+        var clientIp = GetClientIp();
+
+        if (_regSecurity.IsBlocked(clientIp, out int remainingAttempts, out var retryAfter))
+        {
+            model.IsIpBlocked = true;
+            model.RemainingAttempts = 0;
+            ModelState.AddModelError(string.Empty, $"Превышено максимальное количество попыток регистрации (3) с вашего IP-адреса. Доступ временно заблокирован на {(int)Math.Ceiling(retryAfter?.TotalMinutes ?? 15)} мин.");
+            return View(model);
+        }
+
+        int remaining = _regSecurity.RecordAttempt(clientIp);
+        model.RemainingAttempts = remaining;
+
         if (string.IsNullOrWhiteSpace(model.InviteCode))
         {
             ModelState.AddModelError("InviteCode", "Укажите инвайт-код.");
@@ -352,12 +441,16 @@ public class AccountController : Controller
             }
             else if (token.ExpiresAt.HasValue && token.ExpiresAt < DateTime.UtcNow)
             {
-                ModelState.AddModelError("InviteCode", "Срок действия инвайт-кода истек.");
+                ModelState.AddModelError("InviteCode", "Срок действия инвайт-кода истек (коды действуют 5 минут). Запросите новый код у Администратора.");
             }
             else
             {
                 model.TargetRole = token.TargetRole;
                 model.Note = token.Note;
+                if (token.ExpiresAt.HasValue)
+                {
+                    model.RemainingCodeSeconds = Math.Max(0, (int)(token.ExpiresAt.Value - DateTime.UtcNow).TotalSeconds);
+                }
             }
         }
 
@@ -459,6 +552,83 @@ public class AccountController : Controller
             ModelState.AddModelError(string.Empty, ex.Message);
             return View(model);
         }
+    }
+
+    [HttpGet]
+    [AllowAnonymous]
+    public async Task<IActionResult> ValidateInviteCode(string? code)
+    {
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            return Json(new { isValid = false, message = "Введите инвайт-код." });
+        }
+
+        var cleanCode = code.Trim().ToUpper().Replace(" ", "");
+        var cleanRaw = cleanCode.Replace("-", "");
+
+        // 1. Проверяем служебные инвайт-токены (Преподаватель / Администратор)
+        var staffToken = await _db.SystemInviteTokens.FirstOrDefaultAsync(t => t.Token.ToUpper() == cleanCode);
+        if (staffToken != null)
+        {
+            if (staffToken.IsUsed)
+            {
+                return Json(new { isValid = false, expired = true, message = "Этот инвайт-код уже был использован." });
+            }
+            if (staffToken.ExpiresAt.HasValue && staffToken.ExpiresAt.Value < DateTime.UtcNow)
+            {
+                return Json(new { isValid = false, expired = true, message = "Срок действия инвайт-кода истек (коды действуют 5 минут)." });
+            }
+
+            int remainingSec = staffToken.ExpiresAt.HasValue 
+                ? Math.Max(0, (int)(staffToken.ExpiresAt.Value - DateTime.UtcNow).TotalSeconds) 
+                : 300;
+
+            string roleName = staffToken.TargetRole == UserRole.Admin ? "Администратор" : "Преподаватель";
+            return Json(new 
+            { 
+                isValid = true, 
+                type = "staff", 
+                role = roleName, 
+                note = staffToken.Note,
+                remainingSeconds = remainingSec,
+                message = $"Инвайт подтвержден: роль {roleName}"
+            });
+        }
+
+        // 2. Проверяем инвайт-коды учебных групп
+        var group = await _db.StudentGroups.FirstOrDefaultAsync(g => 
+            g.InviteCode.ToUpper() == cleanCode || 
+            g.InviteCode.ToUpper().Replace("-", "") == cleanRaw);
+
+        if (group != null)
+        {
+            if (group.InviteCodeExpiresAt.HasValue && group.InviteCodeExpiresAt.Value < DateTime.UtcNow)
+            {
+                return Json(new 
+                { 
+                    isValid = false, 
+                    expired = true, 
+                    message = "Срок действия инвайт-кода истек. Инвайт-коды действуют ровно 5 минут в целях безопасности. Попросите преподавателя обновить код." 
+                });
+            }
+
+            int remainingSec = group.InviteCodeExpiresAt.HasValue 
+                ? Math.Max(0, (int)(group.InviteCodeExpiresAt.Value - DateTime.UtcNow).TotalSeconds) 
+                : 300;
+
+            return Json(new 
+            { 
+                isValid = true, 
+                type = "group", 
+                groupId = group.Id,
+                name = group.Name, 
+                description = group.Description,
+                remainingSeconds = remainingSec,
+                message = $"Инвайт подтвержден: Группа {group.Name}"
+            });
+        }
+
+        return Json(new { isValid = false, message = "Инвайт-код не найден в системе." });
     }
 
     [HttpGet]

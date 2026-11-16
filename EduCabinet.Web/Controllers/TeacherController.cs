@@ -1820,6 +1820,23 @@ public class TeacherController : Controller
             .ThenBy(g => g.Name)
             .ToListAsync();
 
+        // Автоматически обновляем инвайт-код, если он отсутствует или истек (5-минутный жизненный цикл)
+        bool needsSave = false;
+        foreach (var g in groups)
+        {
+            if (string.IsNullOrWhiteSpace(g.InviteCode) || g.InviteCodeExpiresAt == null || g.InviteCodeExpiresAt.Value <= DateTime.UtcNow)
+            {
+                g.InviteCode = Services.InviteCodeGenerator.GenerateCode(g.Name);
+                g.InviteCodeGeneratedAt = DateTime.UtcNow;
+                g.InviteCodeExpiresAt = DateTime.UtcNow.AddMinutes(5);
+                needsSave = true;
+            }
+        }
+        if (needsSave)
+        {
+            await _db.SaveChangesAsync();
+        }
+
         var studentIds = groups.SelectMany(g => g.Memberships).Select(m => m.StudentId).Distinct().ToList();
 
         var progresses = await _db.LectureProgresses
@@ -1846,6 +1863,7 @@ public class TeacherController : Controller
                 GroupName = g.Name,
                 Description = g.Description,
                 InviteCode = g.InviteCode,
+                InviteCodeExpiresAt = g.InviteCodeExpiresAt,
                 CourseNumber = g.CourseNumber,
                 StudyDurationYears = g.StudyDurationYears,
                 AdmissionYear = g.AdmissionYear
@@ -1952,6 +1970,8 @@ public class TeacherController : Controller
                 Name = trimmedName,
                 Description = description?.Trim(),
                 InviteCode = finalCode,
+                InviteCodeGeneratedAt = DateTime.UtcNow,
+                InviteCodeExpiresAt = DateTime.UtcNow.AddMinutes(5),
                 CourseNumber = finalCourse,
                 StudyDurationYears = finalDuration,
                 AdmissionYear = DateTime.Now.Year
@@ -2000,6 +2020,49 @@ public class TeacherController : Controller
             TempData["SuccessMessage"] = $"Группа {groupName} успешно удалена.";
         }
         return RedirectToAction(nameof(Students));
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    [Authorize(Roles = "Teacher,Admin")]
+    public async Task<IActionResult> RefreshGroupInviteCode(int groupId)
+    {
+        var group = await _db.StudentGroups.FindAsync(groupId);
+        if (group == null)
+        {
+            return Json(new { success = false, message = "Группа не найдена" });
+        }
+
+        string newCode = Services.InviteCodeGenerator.GenerateCode(group.Name);
+        while (await _db.StudentGroups.AnyAsync(g => g.Id != group.Id && g.InviteCode.ToUpper() == newCode.ToUpper()))
+        {
+            newCode = Services.InviteCodeGenerator.GenerateCode(group.Name);
+        }
+
+        group.InviteCode = newCode;
+        group.InviteCodeGeneratedAt = DateTime.UtcNow;
+        group.InviteCodeExpiresAt = DateTime.UtcNow.AddMinutes(5);
+        await _db.SaveChangesAsync();
+
+        await _eventLogger.LogActionAsync(
+            GetCurrentUserId(),
+            "GROUP_INVITE_REFRESH",
+            $"Обновлен инвайт-код для группы {group.Name}: {newCode} (срок действия: 5 минут)",
+            User.Identity?.Name ?? "Преподаватель",
+            null,
+            HttpContext.Connection.RemoteIpAddress?.ToString()
+        );
+
+        return Json(new
+        {
+            success = true,
+            groupId = group.Id,
+            groupName = group.Name,
+            inviteCode = group.InviteCode,
+            expiresAt = group.InviteCodeExpiresAt?.ToString("o"),
+            remainingSeconds = 300,
+            message = $"Инвайт-код группы {group.Name} успешно обновлен! Срок действия — 5 минут."
+        });
     }
 
     [HttpPost]
@@ -2259,6 +2322,7 @@ public class TeacherController : Controller
             TargetRole = UserRole.Teacher,
             Note = string.IsNullOrWhiteSpace(note) ? "Инвайт преподавателя" : note.Trim(),
             CreatedAt = DateTime.UtcNow,
+            ExpiresAt = DateTime.UtcNow.AddMinutes(5),
             IsUsed = false
         };
 
@@ -2268,14 +2332,48 @@ public class TeacherController : Controller
         await _eventLogger.LogActionAsync(
             GetCurrentUserId(),
             "INVITE_CREATE",
-            $"Администратор создал инвайт-код для преподавателя: {tokenString}",
+            $"Администратор создал инвайт-код для преподавателя: {tokenString} (действителен 5 минут)",
             User.Identity?.Name ?? "Admin",
             null,
             HttpContext.Connection.RemoteIpAddress?.ToString()
         );
 
-        TempData["SuccessMessage"] = $"Инвайт-код для преподавателя успешно создан: {tokenString}";
+        TempData["SuccessMessage"] = $"Инвайт-код для преподавателя успешно создан: {tokenString} (срок действия: 5 минут)";
         return RedirectToAction(nameof(StaffInvites));
+    }
+
+    [HttpPost]
+    [Authorize(Roles = "Admin")]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> RefreshStaffInvite(int id)
+    {
+        var invite = await _db.SystemInviteTokens.FindAsync(id);
+        if (invite == null || invite.IsUsed)
+        {
+            return Json(new { success = false, message = "Инвайт не найден или уже использован" });
+        }
+
+        invite.ExpiresAt = DateTime.UtcNow.AddMinutes(5);
+        await _db.SaveChangesAsync();
+
+        await _eventLogger.LogActionAsync(
+            GetCurrentUserId(),
+            "INVITE_REFRESH",
+            $"Администратор продлил срок действия инвайт-кода {invite.Token} на 5 минут",
+            User.Identity?.Name ?? "Admin",
+            null,
+            HttpContext.Connection.RemoteIpAddress?.ToString()
+        );
+
+        return Json(new
+        {
+            success = true,
+            id = invite.Id,
+            token = invite.Token,
+            expiresAt = invite.ExpiresAt?.ToString("o"),
+            remainingSeconds = 300,
+            message = $"Инвайт-код {invite.Token} продлен на 5 минут."
+        });
     }
 
     [HttpPost]

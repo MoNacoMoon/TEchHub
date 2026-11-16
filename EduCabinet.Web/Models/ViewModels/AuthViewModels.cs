@@ -45,6 +45,9 @@ public class RegisterViewModel
     public string? GroupName { get; set; }
     public string? GroupDescription { get; set; }
     public bool IsCodeLocked { get; set; }
+    public int RemainingAttempts { get; set; } = 3;
+    public bool IsIpBlocked { get; set; } = false;
+    public int RemainingCodeSeconds { get; set; } = 300;
 
     [Required(ErrorMessage = "Введите пароль")]
     [StringLength(100, MinimumLength = 6, ErrorMessage = "Пароль должен быть не менее 6 символов")]
@@ -109,6 +112,9 @@ public class RegisterStaffViewModel
     public string RoleNameRussian => TargetRole == UserRole.Admin ? "Администратор" : "Преподаватель";
     public string? Note { get; set; }
     public bool IsCodeLocked { get; set; }
+    public int RemainingAttempts { get; set; } = 3;
+    public bool IsIpBlocked { get; set; } = false;
+    public int RemainingCodeSeconds { get; set; } = 300;
 }
 
 public class ForgotPasswordViewModel

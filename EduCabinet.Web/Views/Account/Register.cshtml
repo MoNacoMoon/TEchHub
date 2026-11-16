@@ -17,98 +17,136 @@
                         <span class="text-muted small">Образовательная платформа TechHub</span>
                     </div>
                 </div>
+                <div class="text-end">
+                    <span class="badge @(Model.RemainingAttempts > 1 ? "bg-secondary-subtle text-secondary" : "bg-warning-subtle text-warning") font-mono small" title="Ограничение в целях безопасности: максимум 3 попытки на 1 IP-адрес">
+                        <i class="bi bi-shield-check me-1"></i>Попыток: @Model.RemainingAttempts/3
+                    </span>
+                </div>
             </div>
 
-            <form asp-action="Register" method="post" autocomplete="off">
+            @if (Model.IsIpBlocked)
+            {
+                <div class="alert alert-danger d-flex align-items-start gap-2 mb-4 p-3 rounded-3">
+                    <i class="bi bi-shield-slash-fill fs-3 text-danger flex-shrink-0 mt-1"></i>
+                    <div>
+                        <strong class="d-block mb-1">Регистрация временно заблокирована</strong>
+                        <span class="small">Превышен лимит попыток регистрации (максимум 3 попытки с одного IP-адреса). В целях безопасности и защиты от перебора доступ заблокирован на 15 минут.</span>
+                    </div>
+                </div>
+            }
+
+            <form asp-action="Register" method="post" autocomplete="off" id="registerForm">
                 @Html.AntiForgeryToken()
 
                 <div asp-validation-summary="ModelOnly" class="alert alert-danger p-2 small mb-3"></div>
 
-                @if (Model.IsCodeLocked && !string.IsNullOrEmpty(Model.GroupName))
-                {
-                    <input type="hidden" asp-for="InviteCode" />
-                    <input type="hidden" asp-for="GroupId" />
-                    <input type="hidden" asp-for="GroupName" />
-                    <input type="hidden" asp-for="GroupDescription" />
-                    <input type="hidden" asp-for="IsCodeLocked" />
+                <fieldset disabled="@(Model.IsIpBlocked ? "disabled" : null)">
+                    @if (Model.IsCodeLocked && !string.IsNullOrEmpty(Model.GroupName))
+                    {
+                        <input type="hidden" asp-for="InviteCode" id="hiddenInviteCode" />
+                        <input type="hidden" asp-for="GroupId" />
+                        <input type="hidden" asp-for="GroupName" />
+                        <input type="hidden" asp-for="GroupDescription" />
+                        <input type="hidden" asp-for="IsCodeLocked" />
 
-                    <div class="p-3 mb-3 rounded-3" style="background: var(--primary-glow); border: 1px solid var(--border-focus);">
-                        <div class="d-flex align-items-start justify-content-between gap-2">
-                            <div class="d-flex align-items-center gap-2">
-                                <i class="bi bi-shield-check text-success fs-4"></i>
-                                <div>
-                                    <div class="small text-muted">Зачисление в группу:</div>
-                                    <strong class="fs-5 text-primary">Группа @Model.GroupName</strong>
-                                    @if (!string.IsNullOrEmpty(Model.GroupDescription))
-                                    {
-                                        <div class="small text-muted">@Model.GroupDescription</div>
-                                    }
+                        <div class="p-3 mb-3 rounded-3" style="background: var(--primary-glow); border: 1px solid var(--border-focus);">
+                            <div class="d-flex align-items-start justify-content-between gap-2">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-shield-check text-success fs-4"></i>
+                                    <div>
+                                        <div class="small text-muted">Зачисление в группу:</div>
+                                        <strong class="fs-5 text-primary">Группа @Model.GroupName</strong>
+                                        @if (!string.IsNullOrEmpty(Model.GroupDescription))
+                                        {
+                                            <div class="small text-muted">@Model.GroupDescription</div>
+                                        }
+                                    </div>
                                 </div>
+                                <span class="quiet-tag positive font-mono"><i class="bi bi-lock-fill me-1"></i>Код подтвержден</span>
                             </div>
-                            <span class="quiet-tag positive font-mono"><i class="bi bi-lock-fill me-1"></i>Код подтвержден</span>
+                            <div class="mt-2 pt-2 border-top border-secondary-subtle d-flex justify-content-between align-items-center">
+                                <span class="small font-mono text-muted">Инвайт: @Model.InviteCode</span>
+                                <span class="badge bg-primary-subtle text-primary font-mono small" id="lockedCodeTimer" data-seconds="@Model.RemainingCodeSeconds">
+                                    <i class="bi bi-clock me-1"></i><span class="timer-display">05:00</span>
+                                </span>
+                                <a asp-action="Register" class="small text-decoration-none">Другой код</a>
+                            </div>
                         </div>
-                        <div class="mt-2 pt-2 border-top border-secondary-subtle d-flex justify-content-between align-items-center">
-                            <span class="small font-mono text-muted">Инвайт: @Model.InviteCode</span>
-                            <a asp-action="Register" class="small text-decoration-none">Ввести другой код</a>
+                    }
+                    else
+                    {
+                        <div class="mb-3">
+                            <label asp-for="InviteCode" class="form-label d-flex justify-content-between align-items-center">
+                                <span><i class="bi bi-key-fill text-primary me-1"></i>Инвайт-код учебной группы</span>
+                                <span class="badge bg-warning-subtle text-warning small font-mono"><i class="bi bi-stopwatch me-1"></i>Действует 5 минут</span>
+                            </label>
+                            <div class="input-group">
+                                <span class="input-group-text"><i class="bi bi-qr-code"></i></span>
+                                <input asp-for="InviteCode" id="inputInviteCode" class="form-control font-mono text-uppercase" placeholder="Например: 111-U2VL7F" required autocomplete="off" />
+                                <button type="button" class="btn btn-outline-secondary" id="checkCodeBtn" title="Проверить инвайт-код">
+                                    <i class="bi bi-arrow-repeat"></i>
+                                </button>
+                            </div>
+                            <div id="inviteValidationStatus" class="mt-1 small" style="min-height: 22px;">
+                                <span class="text-muted"><i class="bi bi-info-circle me-1"></i>Введите действующий 5-минутный код группы от преподавателя</span>
+                            </div>
+                            <span asp-validation-for="InviteCode" class="text-danger small"></span>
                         </div>
-                    </div>
-                }
-                else
-                {
+                    }
+
                     <div class="mb-3">
-                        <label asp-for="InviteCode" class="form-label d-flex justify-content-between align-items-center">
-                            <span><i class="bi bi-key-fill text-primary me-1"></i>Инвайт-код учебной группы</span>
-                            <span class="text-muted small">Выдается преподавателем</span>
+                        <label asp-for="FullName" class="form-label">ФИО студента полностью</label>
+                        <input asp-for="FullName" class="form-control" placeholder="Фамилия Имя Отчество" required />
+                        <span asp-validation-for="FullName" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Username" class="form-label">Логин (для входа в кабинет)</label>
+                        <input asp-for="Username" class="form-control" placeholder="Например: ivanov_ii" required />
+                        <span asp-validation-for="Username" class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label asp-for="Email" class="form-label d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-envelope-at text-primary me-1"></i>Электронная почта (обязательно)</span>
+                            <span class="text-muted small">Для кода подтверждения</span>
                         </label>
-                        <div class="input-group">
-                            <span class="input-group-text"><i class="bi bi-qr-code"></i></span>
-                            <input asp-for="InviteCode" class="form-control font-mono text-uppercase" placeholder="Например: 111-U2VL7F" required autocomplete="off" />
+                        <input asp-for="Email" type="email" class="form-control" placeholder="student@mail.ru" required />
+                        <span asp-validation-for="Email" class="text-danger small"></span>
+                    </div>
+
+                    <div class="row g-2 mb-4">
+                        <div class="col-md-6">
+                            <label asp-for="Password" class="form-label">Пароль</label>
+                            <input asp-for="Password" type="password" class="form-control" placeholder="Не менее 6 знаков" required />
+                            <span asp-validation-for="Password" class="text-danger small"></span>
                         </div>
-                        <div class="form-text small text-muted">
-                            Для регистрации в системе необходим уникальный инвайт-код группы или персональная ссылка-приглашение от вашего преподавателя.
+                        <div class="col-md-6">
+                            <label asp-for="ConfirmPassword" class="form-label">Подтверждение</label>
+                            <input asp-for="ConfirmPassword" type="password" class="form-control" placeholder="Повторите пароль" required />
+                            <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
                         </div>
-                        <span asp-validation-for="InviteCode" class="text-danger small"></span>
                     </div>
-                }
 
-                <div class="mb-3">
-                    <label asp-for="FullName" class="form-label">ФИО студента полностью</label>
-                    <input asp-for="FullName" class="form-control" placeholder="Фамилия Имя Отчество" required />
-                    <span asp-validation-for="FullName" class="text-danger small"></span>
-                </div>
+                    @if (Model.IsCodeLocked && !Model.IsIpBlocked)
+                    {
+                        <button type="submit" id="registerSubmitBtn" class="btn btn-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm">
+                            <i class="bi bi-person-check-fill"></i>
+                            <span>Зарегистрироваться</span>
+                        </button>
+                    }
+                    else
+                    {
+                        <button type="submit" id="registerSubmitBtn" class="btn btn-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm" disabled>
+                            <i class="bi bi-person-check-fill"></i>
+                            <span>Зарегистрироваться</span>
+                        </button>
+                    }
 
-                <div class="mb-3">
-                    <label asp-for="Username" class="form-label">Логин (для входа в кабинет)</label>
-                    <input asp-for="Username" class="form-control" placeholder="Например: ivanov_ii" required />
-                    <span asp-validation-for="Username" class="text-danger small"></span>
-                </div>
-
-                <div class="mb-3">
-                    <label asp-for="Email" class="form-label d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-envelope-at text-primary me-1"></i>Электронная почта (обязательно)</span>
-                        <span class="text-muted small">Для кода подтверждения и восстановления</span>
-                    </label>
-                    <input asp-for="Email" type="email" class="form-control" placeholder="student@mail.ru" required />
-                    <span asp-validation-for="Email" class="text-danger small"></span>
-                </div>
-
-                <div class="row g-2 mb-4">
-                    <div class="col-md-6">
-                        <label asp-for="Password" class="form-label">Пароль</label>
-                        <input asp-for="Password" type="password" class="form-control" placeholder="Не менее 6 знаков" required />
-                        <span asp-validation-for="Password" class="text-danger small"></span>
+                    <div id="submitBtnHint" class="text-center text-muted small mt-2 @(Model.IsCodeLocked && !Model.IsIpBlocked ? "d-none" : "")">
+                        <i class="bi bi-lock-fill text-warning me-1"></i>Кнопка заблокирована: требуется ввести правильный действующий инвайт-код (5 мин)
                     </div>
-                    <div class="col-md-6">
-                        <label asp-for="ConfirmPassword" class="form-label">Подтверждение</label>
-                        <input asp-for="ConfirmPassword" type="password" class="form-control" placeholder="Повторите пароль" required />
-                        <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn btn-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2">
-                    <i class="bi bi-person-check-fill"></i>
-                    <span>Зарегистрироваться</span>
-                </button>
+                </fieldset>
             </form>
 
             <div class="text-center mt-3 pt-3 border-top text-muted small">
@@ -118,3 +156,127 @@
         </div>
     </div>
 </div>
+
+@section Scripts {
+<script>
+    (function () {
+        const submitBtn = document.getElementById('registerSubmitBtn');
+        const submitHint = document.getElementById('submitBtnHint');
+        const inputCode = document.getElementById('inputInviteCode');
+        const statusBox = document.getElementById('inviteValidationStatus');
+        const checkBtn = document.getElementById('checkCodeBtn');
+        const isIpBlocked = @(Model.IsIpBlocked ? "true" : "false");
+
+        let timerInterval = null;
+        let debounceTimeout = null;
+
+        function formatTime(totalSeconds) {
+            const m = Math.floor(totalSeconds / 60);
+            const s = totalSeconds % 60;
+            return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        }
+
+        // Если инвайт зафиксирован по ссылке — запускаем таймер
+        const lockedTimerElem = document.getElementById('lockedCodeTimer');
+        if (lockedTimerElem) {
+            let sec = parseInt(lockedTimerElem.getAttribute('data-seconds') || '300', 10);
+            const display = lockedTimerElem.querySelector('.timer-display');
+            if (display) {
+                display.innerText = formatTime(sec);
+                const timer = setInterval(() => {
+                    sec--;
+                    if (sec <= 0) {
+                        clearInterval(timer);
+                        display.innerText = 'Истёк';
+                        lockedTimerElem.classList.remove('bg-primary-subtle', 'text-primary');
+                        lockedTimerElem.classList.add('bg-danger-subtle', 'text-danger');
+                        if (submitBtn) submitBtn.disabled = true;
+                        if (submitHint) {
+                            submitHint.classList.remove('d-none');
+                            submitHint.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>Срок действия инвайт-кода истек (5 минут). Обновите ссылку у преподавателя.';
+                        }
+                    } else {
+                        display.innerText = formatTime(sec);
+                    }
+                }, 1000);
+            }
+        }
+
+        if (inputCode && !isIpBlocked) {
+            function validateCode() {
+                const code = inputCode.value.trim();
+                if (!code || code.length < 3) {
+                    if (statusBox) statusBox.innerHTML = '<span class="text-muted"><i class="bi bi-info-circle me-1"></i>Введите 5-минутный инвайт-код учебной группы</span>';
+                    if (submitBtn) submitBtn.disabled = true;
+                    if (submitHint) {
+                        submitHint.classList.remove('d-none');
+                        submitHint.innerHTML = '<i class="bi bi-lock-fill text-warning me-1"></i>Кнопка заблокирована: требуется ввести правильный действующий инвайт-код (5 мин)';
+                    }
+                    if (timerInterval) clearInterval(timerInterval);
+                    return;
+                }
+
+                if (statusBox) statusBox.innerHTML = '<span class="text-muted"><span class="spinner-border spinner-border-sm me-1" role="status"></span>Проверка кода...</span>';
+
+                fetch('/Account/ValidateInviteCode?code=' + encodeURIComponent(code))
+                    .then(res => res.json())
+                    .then(data => {
+                        if (timerInterval) clearInterval(timerInterval);
+
+                        if (data.isValid) {
+                            let sec = data.remainingSeconds || 300;
+                            if (statusBox) {
+                                statusBox.innerHTML = `<span class="text-success fw-semibold"><i class="bi bi-check-circle-fill me-1"></i>${data.message} <span class="badge bg-success-subtle text-success ms-1 font-mono">⏳ <span id="codeRemaining">${formatTime(sec)}</span></span></span>`;
+                            }
+                            if (submitBtn) submitBtn.disabled = false;
+                            if (submitHint) submitHint.classList.add('d-none');
+
+                            timerInterval = setInterval(() => {
+                                sec--;
+                                const remElem = document.getElementById('codeRemaining');
+                                if (remElem) remElem.innerText = formatTime(Math.max(0, sec));
+
+                                if (sec <= 0) {
+                                    clearInterval(timerInterval);
+                                    if (statusBox) {
+                                        statusBox.innerHTML = '<span class="text-danger fw-semibold"><i class="bi bi-exclamation-triangle-fill me-1"></i>Срок действия инвайт-кода истек (5 минут). Запросите новый код у преподавателя.</span>';
+                                    }
+                                    if (submitBtn) submitBtn.disabled = true;
+                                    if (submitHint) {
+                                        submitHint.classList.remove('d-none');
+                                        submitHint.innerHTML = '<i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>Инвайт-код устарел. Получите новый 5-минутный код у преподавателя.';
+                                    }
+                                }
+                            }, 1000);
+                        } else {
+                            if (statusBox) {
+                                statusBox.innerHTML = `<span class="text-danger"><i class="bi bi-x-circle-fill me-1"></i>${data.message || 'Недействительный инвайт-код'}</span>`;
+                            }
+                            if (submitBtn) submitBtn.disabled = true;
+                            if (submitHint) {
+                                submitHint.classList.remove('d-none');
+                                submitHint.innerHTML = `<i class="bi bi-lock-fill text-warning me-1"></i>${data.message || 'Введите правильный инвайт-код'}`;
+                            }
+                        }
+                    })
+                    .catch(() => {
+                        if (statusBox) statusBox.innerHTML = '<span class="text-warning">Не удалось проверить код онлайн. Проверьте сеть.</span>';
+                    });
+            }
+
+            inputCode.addEventListener('input', function () {
+                clearTimeout(debounceTimeout);
+                debounceTimeout = setTimeout(validateCode, 400);
+            });
+
+            if (checkBtn) {
+                checkBtn.addEventListener('click', validateCode);
+            }
+
+            if (inputCode.value.trim().length >= 3) {
+                validateCode();
+            }
+        }
+    })();
+</script>
+}
