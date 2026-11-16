@@ -3,6 +3,44 @@
     ViewData["Title"] = "Мои отчёты и практические работы";
 }
 
+<style>
+    .report-accordion .accordion-item {
+        border-color: var(--bs-border-color, #dee2e6) !important;
+        transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .report-accordion .accordion-item:hover {
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+    }
+    .report-accordion .accordion-button {
+        background-color: var(--bs-body-bg, #fff);
+        color: var(--bs-body-color, #212529);
+        box-shadow: none !important;
+        border-radius: 0.5rem !important;
+    }
+    .report-accordion .accordion-button:not(.collapsed) {
+        background-color: var(--bs-light, #f8f9fa);
+        color: var(--bs-body-color, #212529);
+        border-bottom-left-radius: 0 !important;
+        border-bottom-right-radius: 0 !important;
+    }
+    .report-accordion .accordion-button::after {
+        flex-shrink: 0;
+        margin-left: 0.75rem;
+    }
+    .report-row-pending {
+        border-left: 4px solid var(--bs-warning, #ffc107) !important;
+    }
+    .report-row-approved {
+        border-left: 4px solid var(--bs-success, #198754) !important;
+    }
+    .report-row-revision {
+        border-left: 4px solid var(--bs-danger, #dc3545) !important;
+    }
+    .report-row-rejected {
+        border-left: 4px solid var(--bs-secondary, #6c757d) !important;
+    }
+</style>
+
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
     <div>
         <h2 class="fw-bold mb-1">
@@ -52,15 +90,32 @@
 }
 else
 {
-    <div class="d-grid gap-4">
+    <!-- Панель управления списком -->
+    <div class="d-flex justify-content-between align-items-center mb-2 px-1 text-muted small">
+        <div>
+            Всего работ: <strong>@Model.Reports.Count</strong>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-link btn-sm text-decoration-none p-0 text-primary small" onclick="toggleAllStudentAccordions(true)">
+                <i class="bi bi-arrows-expand me-1"></i>Развернуть все
+            </button>
+            <span class="text-muted">&bull;</span>
+            <button type="button" class="btn btn-link btn-sm text-decoration-none p-0 text-muted small" onclick="toggleAllStudentAccordions(false)">
+                <i class="bi bi-arrows-collapse me-1"></i>Свернуть все
+            </button>
+        </div>
+    </div>
+
+    <!-- Компактный раскрывающийся список отчетов студента -->
+    <div class="accordion report-accordion d-flex flex-column gap-2" id="studentReportsAccordion">
         @foreach (var r in Model.Reports)
         {
-            string borderClass = r.Status switch
+            string rowClass = r.Status switch
             {
-                ReportSubmissionStatus.Approved => "border-success",
-                ReportSubmissionStatus.NeedsRevision => "border-danger",
-                ReportSubmissionStatus.Rejected => "border-secondary",
-                _ => "border-warning"
+                ReportSubmissionStatus.Approved => "report-row-approved",
+                ReportSubmissionStatus.NeedsRevision => "report-row-revision",
+                ReportSubmissionStatus.Rejected => "report-row-rejected",
+                _ => "report-row-pending"
             };
 
             string ext = System.IO.Path.GetExtension(r.OriginalFileName).ToLowerInvariant();
@@ -73,113 +128,147 @@ else
                 _ => "bi-file-earmark-text-fill text-secondary"
             };
 
-            <div class="card shadow-sm border-0 border-start @borderClass border-4">
-                <div class="card-header py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center gap-2">
-                    <div>
-                        <span class="badge bg-secondary me-2">@r.DisciplineTitle</span>
-                        <strong class="fs-6">@r.LectureTitle</strong>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        @switch (r.Status)
-                        {
-                            case ReportSubmissionStatus.Pending:
-                                <span class="badge bg-warning text-dark px-2 py-1"><i class="bi bi-hourglass-split me-1"></i>На проверке</span>
-                                break;
-                            case ReportSubmissionStatus.Approved:
-                                <span class="badge bg-success px-2 py-1"><i class="bi bi-check-circle-fill me-1"></i>Зачтено (@(r.Grade ?? 0)/@(r.MaxScore ?? 100))</span>
-                                break;
-                            case ReportSubmissionStatus.NeedsRevision:
-                                <span class="badge bg-danger px-2 py-1"><i class="bi bi-arrow-repeat me-1"></i>На доработке</span>
-                                break;
-                            case ReportSubmissionStatus.Rejected:
-                                <span class="badge bg-secondary px-2 py-1"><i class="bi bi-x-circle me-1"></i>Не зачтено</span>
-                                break;
-                        }
-                    </div>
-                </div>
-
-                <div class="card-body p-4">
-                    <!-- Загруженный файл студента -->
-                    <div class="p-3 bg-light rounded border d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
-                        <div class="d-flex align-items-center gap-3">
-                            <i class="bi @fileIcon fs-2"></i>
-                            <div>
-                                <div class="fw-bold fs-6">@r.OriginalFileName</div>
-                                <div class="text-muted small">
-                                    Отправлено: @r.SubmittedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") | Размер: @(r.FileSizeBytes >= 1024 * 1024 ? $"{(r.FileSizeBytes / (1024.0 * 1024.0)):F1} МБ" : $"{(r.FileSizeBytes / 1024.0):F0} КБ")
+            <div class="accordion-item shadow-sm rounded-3 overflow-hidden @rowClass">
+                <h2 class="accordion-header" id="heading_stu_@r.Id">
+                    <button class="accordion-button collapsed py-2 px-3" type="button" data-bs-toggle="collapse" data-bs-target="#collapse_stu_@r.Id" aria-expanded="false" aria-controls="collapse_stu_@r.Id">
+                        <div class="d-flex flex-wrap align-items-center justify-content-between w-100 me-2 gap-2">
+                            <!-- Слева: Дисциплина и тема -->
+                            <div class="d-flex align-items-center gap-3 text-start">
+                                <div class="avatar-circle-sm bg-primary-subtle text-primary fw-bold rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px; font-size: 0.8rem;">
+                                    <i class="bi bi-file-earmark-text"></i>
                                 </div>
-                            </div>
-                        </div>
-                        <a asp-action="DownloadReport" asp-route-id="@r.Id" class="btn btn-outline-primary btn-sm px-3">
-                            <i class="bi bi-download me-1"></i> Скачать мой файл
-                        </a>
-                    </div>
-
-                    @if (!string.IsNullOrWhiteSpace(r.StudentComment))
-                    {
-                        <div class="mb-3">
-                            <div class="text-muted small fw-semibold">Ваш комментарий к отправке:</div>
-                            <div class="p-2 px-3 bg-white border rounded small text-dark mt-1" style="white-space: pre-wrap;">@r.StudentComment</div>
-                        </div>
-                    }
-
-                    <!-- Рецензия и файл преподавателя -->
-                    @if (r.ReviewedAt.HasValue)
-                    {
-                        <div class="p-3 bg-light rounded border mb-3">
-                            <div class="d-flex justify-content-between small text-muted mb-2">
-                                <span><i class="bi bi-person-check-fill text-success me-1"></i>Проверил: <strong>@(r.ReviewedByTeacherName ?? "Преподаватель")</strong></span>
-                                <span><i class="bi bi-calendar3 me-1"></i>@r.ReviewedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
-                            </div>
-
-                            <div class="d-flex align-items-center gap-2 mb-2">
-                                <span class="fw-bold">Оценка:</span>
-                                <span class="fs-5 fw-bold @(r.Status == ReportSubmissionStatus.Approved ? "text-success" : "text-danger")">
-                                    @(r.Grade ?? 0) / @(r.MaxScore ?? 100) баллов
-                                </span>
-                            </div>
-
-                            @if (!string.IsNullOrEmpty(r.TeacherFeedback))
-                            {
-                                <div class="p-2 px-3 bg-white rounded border small text-dark mb-2">
-                                    <strong>Замечания преподавателя:</strong>
-                                    <div class="mt-1" style="white-space: pre-wrap;">@r.TeacherFeedback</div>
-                                </div>
-                            }
-
-                            @if (!string.IsNullOrEmpty(r.ReviewedFilePath))
-                            {
-                                <div class="p-2 px-3 bg-success-subtle rounded border border-success d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2">
+                                <div>
                                     <div class="d-flex align-items-center gap-2">
-                                        <i class="bi bi-file-earmark-check-fill text-success fs-3"></i>
-                                        <div>
-                                            <div class="fw-bold text-success small">Файл с правками и пометками от преподавателя:</div>
-                                            <div class="small text-muted">@r.ReviewedFileName @(r.ReviewedFileSizeBytes.HasValue ? $"({r.ReviewedFileSizeBytes.Value / 1024} КБ)" : "")</div>
-                                        </div>
+                                        <span class="badge bg-secondary">@r.DisciplineTitle</span>
+                                        <span class="fw-bold fs-6 text-dark">@r.LectureTitle</span>
                                     </div>
-                                    <a asp-action="DownloadTeacherReviewedFile" asp-route-id="@r.Id" class="btn btn-success btn-sm px-3 fw-semibold">
-                                        <i class="bi bi-download me-1"></i> Скачать файл с правками
-                                    </a>
+                                    <div class="text-muted small">
+                                        <span>Файл: @r.OriginalFileName</span>
+                                    </div>
                                 </div>
-                            }
-                        </div>
-                    }
+                            </div>
 
-                    <!-- Действие: перейти к лекции -->
-                    <div class="d-flex justify-content-end gap-2 border-top pt-3">
-                        <a asp-action="Lecture" asp-route-id="@r.LectureId" class="btn @(r.Status == ReportSubmissionStatus.NeedsRevision ? "btn-warning text-dark fw-bold" : "btn-outline-primary") btn-sm px-3">
-                            @if (r.Status == ReportSubmissionStatus.NeedsRevision)
-                            {
-                                <i class="bi bi-upload me-1"></i> <span>Загрузить исправление в лекции</span>
-                            }
-                            else
-                            {
-                                <i class="bi bi-box-arrow-up-right me-1"></i> <span>Перейти к материалу лекции</span>
-                            }
-                        </a>
+                            <!-- Справа: Дата отправки и статус -->
+                            <div class="d-flex align-items-center gap-3 ms-auto">
+                                <span class="text-muted small d-none d-lg-inline">
+                                    <i class="bi bi-clock me-1"></i>@r.SubmittedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                </span>
+                                @switch (r.Status)
+                                {
+                                    case ReportSubmissionStatus.Pending:
+                                        <span class="badge bg-warning text-dark px-3 py-2"><i class="bi bi-hourglass-split me-1"></i>На проверке</span>
+                                        break;
+                                    case ReportSubmissionStatus.Approved:
+                                        <span class="badge bg-success px-3 py-2"><i class="bi bi-check-circle-fill me-1"></i>Зачтено (@(r.Grade ?? 0)/@(r.MaxScore ?? 100))</span>
+                                        break;
+                                    case ReportSubmissionStatus.NeedsRevision:
+                                        <span class="badge bg-danger px-3 py-2"><i class="bi bi-arrow-repeat me-1"></i>На доработке</span>
+                                        break;
+                                    case ReportSubmissionStatus.Rejected:
+                                        <span class="badge bg-secondary px-3 py-2"><i class="bi bi-x-circle me-1"></i>Не зачтено</span>
+                                        break;
+                                }
+                            </div>
+                        </div>
+                    </button>
+                </h2>
+
+                <div id="collapse_stu_@r.Id" class="accordion-collapse collapse" aria-labelledby="heading_stu_@r.Id">
+                    <div class="accordion-body p-4 bg-white border-top">
+                        <!-- Загруженный файл студента -->
+                        <div class="p-3 bg-light rounded border d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+                            <div class="d-flex align-items-center gap-3">
+                                <i class="bi @fileIcon fs-2"></i>
+                                <div>
+                                    <div class="fw-bold fs-6">@r.OriginalFileName</div>
+                                    <div class="text-muted small">
+                                        Отправлено: @r.SubmittedAt.ToLocalTime().ToString("dd.MM.yyyy HH:mm") | Размер: @(r.FileSizeBytes >= 1024 * 1024 ? $"{(r.FileSizeBytes / (1024.0 * 1024.0)):F1} МБ" : $"{(r.FileSizeBytes / 1024.0):F0} КБ")
+                                    </div>
+                                </div>
+                            </div>
+                            <a asp-action="DownloadReport" asp-route-id="@r.Id" class="btn btn-outline-primary btn-sm px-3">
+                                <i class="bi bi-download me-1"></i> Скачать мой файл
+                            </a>
+                        </div>
+
+                        @if (!string.IsNullOrWhiteSpace(r.StudentComment))
+                        {
+                            <div class="mb-3">
+                                <div class="text-muted small fw-semibold">Ваш комментарий к отправке:</div>
+                                <div class="p-2 px-3 bg-white border rounded small text-dark mt-1" style="white-space: pre-wrap;">@r.StudentComment</div>
+                            </div>
+                        }
+
+                        <!-- Рецензия и файл преподавателя -->
+                        @if (r.ReviewedAt.HasValue)
+                        {
+                            <div class="p-3 bg-light rounded border mb-3">
+                                <div class="d-flex justify-content-between small text-muted mb-2">
+                                    <span><i class="bi bi-person-check-fill text-success me-1"></i>Проверил: <strong>@(r.ReviewedByTeacherName ?? "Преподаватель")</strong></span>
+                                    <span><i class="bi bi-calendar3 me-1"></i>@r.ReviewedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")</span>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <span class="fw-bold">Оценка:</span>
+                                    <span class="fs-5 fw-bold @(r.Status == ReportSubmissionStatus.Approved ? "text-success" : "text-danger")">
+                                        @(r.Grade ?? 0) / @(r.MaxScore ?? 100) баллов
+                                    </span>
+                                </div>
+
+                                @if (!string.IsNullOrEmpty(r.TeacherFeedback))
+                                {
+                                    <div class="p-2 px-3 bg-white rounded border small text-dark mb-2">
+                                        <strong>Замечания преподавателя:</strong>
+                                        <div class="mt-1" style="white-space: pre-wrap;">@r.TeacherFeedback</div>
+                                    </div>
+                                }
+
+                                @if (!string.IsNullOrEmpty(r.ReviewedFilePath))
+                                {
+                                    <div class="p-2 px-3 bg-success-subtle rounded border border-success d-flex flex-wrap justify-content-between align-items-center gap-2 mt-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="bi bi-file-earmark-check-fill text-success fs-3"></i>
+                                            <div>
+                                                <div class="fw-bold text-success small">Файл с правками и пометками от преподавателя:</div>
+                                                <div class="small text-muted">@r.ReviewedFileName @(r.ReviewedFileSizeBytes.HasValue ? $"({r.ReviewedFileSizeBytes.Value / 1024} КБ)" : "")</div>
+                                            </div>
+                                        </div>
+                                        <a asp-action="DownloadTeacherReviewedFile" asp-route-id="@r.Id" class="btn btn-success btn-sm px-3 fw-semibold">
+                                            <i class="bi bi-download me-1"></i> Скачать файл с правками
+                                        </a>
+                                    </div>
+                                }
+                            </div>
+                        }
+
+                        <!-- Действие: перейти к лекции -->
+                        <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                            <a asp-action="Lecture" asp-route-id="@r.LectureId" class="btn @(r.Status == ReportSubmissionStatus.NeedsRevision ? "btn-warning text-dark fw-bold" : "btn-outline-primary") btn-sm px-3">
+                                @if (r.Status == ReportSubmissionStatus.NeedsRevision)
+                                {
+                                    <i class="bi bi-upload me-1"></i> <span>Загрузить исправление в лекции</span>
+                                }
+                                else
+                                {
+                                    <i class="bi bi-box-arrow-up-right me-1"></i> <span>Перейти к материалу лекции</span>
+                                }
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>
         }
     </div>
+}
+
+@section Scripts {
+    <script>
+        function toggleAllStudentAccordions(open) {
+            document.querySelectorAll('#studentReportsAccordion .accordion-collapse').forEach(el => {
+                const bsCollapse = bootstrap.Collapse.getOrCreateInstance(el, { toggle: false });
+                if (open) bsCollapse.show();
+                else bsCollapse.hide();
+            });
+        }
+    </script>
 }
