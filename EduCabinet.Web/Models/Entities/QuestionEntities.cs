@@ -22,6 +22,7 @@ public class ControlQuestion
     public string? Explanation { get; set; } // Пояснение/подсказка
     public string? CorrectTextAnswer { get; set; } // Для ShortText и FillBlank (основной правильный ответ)
     public string? SynonymsCsv { get; set; } // Допустимые варианты через запятую
+    public string? ImageUrl { get; set; } // Иллюстрация к вопросу
 
     public ICollection<ControlQuestionOption> Options { get; set; } = new List<ControlQuestionOption>();
     public ICollection<StudentControlAnswer> StudentAnswers { get; set; } = new List<StudentControlAnswer>();
@@ -37,6 +38,7 @@ public class ControlQuestionOption
     public bool IsCorrect { get; set; } = false;
     public string? MatchingKey { get; set; } // Правая часть соответствия для типа Matching
     public int OrderIndex { get; set; } = 1;
+    public string? ImageUrl { get; set; } // Иллюстрация к варианту ответа
 }
 
 public class StudentControlAnswer
@@ -86,6 +88,7 @@ public class TestQuestion
     public int Points { get; set; } = 1;
     public string? CorrectTextAnswer { get; set; }
     public string? SynonymsCsv { get; set; }
+    public string? ImageUrl { get; set; } // Иллюстрация к вопросу теста
 
     public ICollection<TestQuestionOption> Options { get; set; } = new List<TestQuestionOption>();
     public ICollection<TestAttemptAnswer> AttemptAnswers { get; set; } = new List<TestAttemptAnswer>();
@@ -101,6 +104,7 @@ public class TestQuestionOption
     public bool IsCorrect { get; set; } = false;
     public string? MatchingKey { get; set; } // Соответствие
     public int OrderIndex { get; set; } = 1;
+    public string? ImageUrl { get; set; } // Иллюстрация к варианту ответа
 }
 
 public class TestAttempt

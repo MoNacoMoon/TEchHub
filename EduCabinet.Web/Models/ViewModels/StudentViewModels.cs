@@ -180,6 +180,7 @@ public class ControlQuestionStudyDto
     public QuestionType Type { get; set; }
     public int OrderIndex { get; set; }
     public string? Explanation { get; set; }
+    public string? ImageUrl { get; set; }
     public List<QuestionOptionDto> Options { get; set; } = new();
 
     public bool IsAnswered { get; set; }
@@ -194,6 +195,7 @@ public class QuestionOptionDto
     public int Id { get; set; }
     public string Text { get; set; } = string.Empty;
     public string? MatchingKey { get; set; }
+    public string? ImageUrl { get; set; }
 }
 
 public class TestSummaryDto
@@ -241,6 +243,7 @@ public class TestQuestionTakeDto
     public string Text { get; set; } = string.Empty;
     public QuestionType Type { get; set; }
     public int Points { get; set; }
+    public string? ImageUrl { get; set; }
     public List<QuestionOptionDto> Options { get; set; } = new();
     public List<string> MatchingTargets { get; set; } = new(); // Для Matching вопросов - перемешанные варианты правой стороны
 }
@@ -274,6 +277,7 @@ public class TestAnswerDetailDto
 {
     public string QuestionText { get; set; } = string.Empty;
     public QuestionType Type { get; set; }
+    public string? ImageUrl { get; set; }
     public string GivenAnswer { get; set; } = string.Empty;
     public bool IsCorrect { get; set; }
     public int PointsEarned { get; set; }

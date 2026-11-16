@@ -29,6 +29,8 @@ secrets.json
 # Пользовательские загрузки в репозиторий
 wwwroot/uploads/*
 !wwwroot/uploads/.gitkeep
+dataprotection-keys/
+**/dataprotection-keys/
 
 # Вспомогательные папки агента
 scratch/

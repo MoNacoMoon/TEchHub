@@ -108,9 +108,17 @@
                 {
                     var a = Model.Answers[i];
                     <div class="list-group-item p-3">
-                        <div class="d-flex justify-content-between align-items-start gap-2">
-                            <div>
-                                <span class="fw-semibold">Вопрос @(i + 1):</span> @a.QuestionText
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div class="d-flex align-items-start gap-3">
+                                @if (!string.IsNullOrEmpty(a.ImageUrl))
+                                {
+                                    <div class="flex-shrink-0">
+                                        <img src="@a.ImageUrl" alt="Иллюстрация к вопросу" class="rounded border shadow-sm" style="width: 60px; height: 60px; object-fit: cover;" />
+                                    </div>
+                                }
+                                <div>
+                                    <span class="fw-semibold">Вопрос @(i + 1):</span> @a.QuestionText
+                                </div>
                             </div>
                             <div>
                                 @if (a.IsCorrect)

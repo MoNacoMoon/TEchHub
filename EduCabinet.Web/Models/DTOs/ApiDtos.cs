@@ -100,6 +100,7 @@ public class ControlQuestionDto
     public QuestionType Type { get; set; }
     public int OrderIndex { get; set; }
     public string? Explanation { get; set; }
+    public string? ImageUrl { get; set; }
     public List<OptionDto> Options { get; set; } = new();
     public bool IsAnswered { get; set; }
     public bool IsCorrect { get; set; }
@@ -111,6 +112,7 @@ public class OptionDto
     public int Id { get; set; }
     public string Text { get; set; } = string.Empty;
     public string? MatchingKey { get; set; }
+    public string? ImageUrl { get; set; }
 }
 
 public class SubmitAnswerRequestDto
@@ -160,6 +162,7 @@ public class TestQuestionDto
     public string Text { get; set; } = string.Empty;
     public QuestionType Type { get; set; }
     public int Points { get; set; }
+    public string? ImageUrl { get; set; }
     public List<OptionDto> Options { get; set; } = new();
     public List<string> MatchingTargets { get; set; } = new();
 }

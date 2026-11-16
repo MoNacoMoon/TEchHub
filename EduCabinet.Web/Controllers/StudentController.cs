@@ -481,11 +481,13 @@ public class StudentController : Controller
                 Type = cq.Type,
                 OrderIndex = cq.OrderIndex,
                 Explanation = cq.Explanation,
+                ImageUrl = cq.ImageUrl,
                 Options = cq.Options.OrderBy(o => o.OrderIndex).Select(o => new QuestionOptionDto
                 {
                     Id = o.Id,
                     Text = o.Text,
-                    MatchingKey = o.MatchingKey
+                    MatchingKey = o.MatchingKey,
+                    ImageUrl = o.ImageUrl
                 }).ToList(),
                 IsAnswered = studentAns != null,
                 StudentGivenAnswer = studentAns?.GivenAnswer,
@@ -704,11 +706,13 @@ public class StudentController : Controller
                 Text = q.Text,
                 Type = q.Type,
                 Points = q.Points,
+                ImageUrl = q.ImageUrl,
                 Options = options.Select(o => new QuestionOptionDto
                 {
                     Id = o.Id,
                     Text = o.Text,
-                    MatchingKey = o.MatchingKey
+                    MatchingKey = o.MatchingKey,
+                    ImageUrl = o.ImageUrl
                 }).ToList()
             };
 
@@ -879,6 +883,7 @@ public class StudentController : Controller
             {
                 QuestionText = ans.Question.Text,
                 Type = ans.Question.Type,
+                ImageUrl = ans.Question.ImageUrl,
                 GivenAnswer = ans.GivenAnswer,
                 IsCorrect = ans.IsCorrect,
                 PointsEarned = ans.PointsEarned

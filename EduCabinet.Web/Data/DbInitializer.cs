@@ -24,6 +24,12 @@ public static class DbInitializer
         try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Users"" ADD COLUMN ""PasswordResetCode"" TEXT NULL;"); } catch { }
         try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Users"" ADD COLUMN ""PasswordResetExpiresAt"" TEXT NULL;"); } catch { }
 
+        // Гарантируем наличие колонок изображений к вопросам и вариантам ответов
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""ControlQuestions"" ADD COLUMN ""ImageUrl"" TEXT NULL;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""ControlQuestionOptions"" ADD COLUMN ""ImageUrl"" TEXT NULL;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""TestQuestions"" ADD COLUMN ""ImageUrl"" TEXT NULL;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""TestQuestionOptions"" ADD COLUMN ""ImageUrl"" TEXT NULL;"); } catch { }
+
         // Гарантируем наличие таблицы SystemInviteTokens
         try
         {

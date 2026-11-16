@@ -118,23 +118,42 @@
                 @foreach (var q in Model.Questions.OrderBy(q => q.OrderIndex))
                 {
                     <div class="list-group-item p-3">
-                        <div class="d-flex justify-content-between align-items-start gap-2">
-                            <div>
-                                <div class="d-flex align-items-center gap-2 mb-1">
-                                    <span class="badge bg-secondary">#@q.OrderIndex</span>
-                                    <span class="badge bg-light text-body border">@q.Type</span>
-                                    <span class="badge bg-info-subtle text-info border">Балл: @q.Points</span>
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div class="d-flex align-items-start gap-3 flex-grow-1">
+                                @if (!string.IsNullOrEmpty(q.ImageUrl))
+                                {
+                                    <div class="flex-shrink-0">
+                                        <img src="@q.ImageUrl" alt="Иллюстрация" class="rounded border shadow-sm" style="width: 64px; height: 64px; object-fit: cover;" />
+                                    </div>
+                                }
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                                        <span class="badge bg-secondary">#@q.OrderIndex</span>
+                                        <span class="badge bg-light text-body border">@q.Type</span>
+                                        <span class="badge bg-info-subtle text-info border">Балл: @q.Points</span>
+                                        @if (!string.IsNullOrEmpty(q.ImageUrl))
+                                        {
+                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">
+                                                <i class="bi bi-image me-1"></i>С изображением
+                                            </span>
+                                        }
+                                    </div>
+                                    <div class="fw-semibold text-body">@q.Text</div>
+                                    <div class="small text-muted mt-1">Вариантов/элементов: @q.OptionsCount</div>
                                 </div>
-                                <div class="fw-semibold">@q.Text</div>
-                                <div class="small text-muted mt-1">Вариантов/элементов: @q.OptionsCount</div>
                             </div>
 
-                            <form asp-action="DeleteTestQuestion" asp-route-id="@q.Id" method="post" onsubmit="return confirm('Удалить вопрос из теста?')">
-                                @Html.AntiForgeryToken()
-                                <button type="submit" class="btn btn-outline-danger btn-sm" title="Удалить вопрос">
-                                    <i class="bi bi-trash"></i>
-                                </button>
-                            </form>
+                            <div class="d-flex gap-2">
+                                <a asp-action="EditTestQuestion" asp-route-id="@q.Id" class="btn btn-outline-primary btn-sm" title="Редактировать вопрос">
+                                    <i class="bi bi-pencil me-1"></i> Изменить
+                                </a>
+                                <form asp-action="DeleteTestQuestion" asp-route-id="@q.Id" method="post" onsubmit="return confirm('Удалить вопрос из теста?')">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Удалить вопрос">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
                         </div>
                     </div>
                 }

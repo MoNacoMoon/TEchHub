@@ -4,21 +4,34 @@
     ViewData["Title"] = "Добавление вопроса в тест";
 }
 
+<nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a asp-action="Disciplines">Дисциплины</a></li>
+        <li class="breadcrumb-item"><a asp-action="EditTest" asp-route-lectureId="@test?.LectureId">Тест: @test?.Title</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Новый вопрос</li>
+    </ol>
+</nav>
+
 <div class="row justify-content-center">
-    <div class="col-lg-8">
+    <div class="col-lg-9">
         <div class="card shadow-sm border-0">
-            <div class="card-header py-3 border-bottom">
-                <h4 class="fw-bold mb-0 text-primary"><i class="bi bi-patch-question me-2"></i>Новый вопрос теста</h4>
-                <div class="text-muted small">Тест: @test?.Title</div>
+            <div class="card-header py-3 border-bottom d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="fw-bold mb-0 text-primary"><i class="bi bi-patch-question me-2"></i>Новый вопрос теста</h4>
+                    <div class="text-muted small">Тест: <strong>@test?.Title</strong></div>
+                </div>
+                <span class="badge bg-light text-muted border">TestPad Style</span>
             </div>
             <div class="card-body p-4">
-                <form asp-action="CreateTestQuestion" asp-route-testId="@test?.Id" method="post">
+                <form asp-action="CreateTestQuestion" asp-route-testId="@test?.Id" method="post" enctype="multipart/form-data" id="questionForm">
                     @Html.AntiForgeryToken()
+                    <input type="hidden" asp-for="TestId" value="@(test?.Id ?? 0)" />
+                    <input type="hidden" asp-for="LectureId" value="@(test?.LectureId ?? 0)" />
 
                     <div asp-validation-summary="ModelOnly" class="alert alert-danger p-2 small"></div>
 
-                    <div class="row">
-                        <div class="col-md-8 mb-3">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
                             <label asp-for="Type" class="form-label fw-semibold">Тип вопроса</label>
                             <select asp-for="Type" class="form-select" id="testQTypeSelect" onchange="switchTestQType()">
                                 <option value="SingleChoice">Выбор одного правильного ответа</option>
@@ -28,7 +41,11 @@
                                 <option value="Matching">На установление соответствия</option>
                             </select>
                         </div>
-                        <div class="col-md-4 mb-3">
+                        <div class="col-md-3">
+                            <label asp-for="Points" class="form-label fw-semibold">Баллы за вопрос</label>
+                            <input asp-for="Points" type="number" min="1" max="100" class="form-control" />
+                        </div>
+                        <div class="col-md-3">
                             <label asp-for="OrderIndex" class="form-label fw-semibold">Порядковый №</label>
                             <input asp-for="OrderIndex" type="number" class="form-control" />
                         </div>
@@ -36,52 +53,137 @@
 
                     <div class="mb-3">
                         <label asp-for="Text" class="form-label fw-semibold">Текст вопроса теста</label>
-                        <textarea asp-for="Text" class="form-control" rows="3" placeholder="Введите текст вопроса..." autofocus></textarea>
+                        <textarea asp-for="Text" class="form-control" rows="3" placeholder="Введите формулировку вопроса (например: «Что изображено на схеме ниже?», «Определите результат выполнения кода:»)..." autofocus></textarea>
                         <span asp-validation-for="Text" class="text-danger small"></span>
                     </div>
 
+                    <!-- Блок прикрепления изображения (в стиле TestPad) -->
+                    <div class="card bg-light border mb-4">
+                        <div class="card-header bg-transparent py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <span class="fw-semibold small text-body">
+                                <i class="bi bi-image text-primary me-1"></i>Изображение к вопросу
+                            </span>
+                            <div class="d-flex gap-2">
+                                <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 small" onclick="toggleUrlInput()">
+                                    <i class="bi bi-link-45deg"></i> <span id="toggleUrlBtnText">Указать ссылку (URL)</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="card-body p-3">
+                            <!-- Скрытый файловый инпут -->
+                            <input type="file" asp-for="ImageFile" id="questionImageFileInput" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp,image/svg+xml" class="d-none" onchange="handleImageFileSelected(this)" />
+                            <input type="hidden" asp-for="RemoveImage" id="removeImageFlag" value="false" />
+
+                            <!-- Drag-and-drop зона в стиле TestPad -->
+                            <div id="imageDropZone" class="testpad-dropzone p-4 text-center border border-2 border-dashed rounded-3 cursor-pointer bg-white" onclick="document.getElementById('questionImageFileInput').click()">
+                                <i class="bi bi-cloud-arrow-up fs-1 text-primary d-block mb-1"></i>
+                                <div class="fw-bold mb-1">Нажмите для выбора файла или перетащите изображение сюда</div>
+                                <div class="text-muted small">Поддерживаются форматы: PNG, JPG, JPEG, GIF, WebP, SVG (до 15 МБ)</div>
+                                <div class="badge bg-primary-subtle text-primary border border-primary-subtle mt-2 p-2 font-monospace">
+                                    <i class="bi bi-clipboard2-check me-1"></i>Лайфхак: можно сделать скриншот (Win+Shift+S) и нажать Ctrl+V прямо здесь!
+                                </div>
+                            </div>
+
+                            <!-- Поле ввода прямой ссылки (по умолчанию скрыто) -->
+                            <div id="imageUrlContainer" class="mt-3" style="display: none;">
+                                <label asp-for="ImageUrl" class="form-label small text-muted mb-1">Прямая ссылка на изображение:</label>
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text"><i class="bi bi-globe"></i></span>
+                                    <input asp-for="ImageUrl" id="questionImageUrlInput" class="form-control" placeholder="https://example.com/image.png или /uploads/..." oninput="handleImageUrlInput(this.value)" />
+                                </div>
+                            </div>
+
+                            <!-- Превью выбранного изображения -->
+                            <div id="imagePreviewContainer" class="mt-3 p-3 bg-white rounded border text-center" style="@(string.IsNullOrEmpty(Model.ImageUrl) ? "display: none;" : "")">
+                                <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle" id="imagePreviewBadge">
+                                        <i class="bi bi-check2-circle me-1"></i>Изображение прикреплено
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="removeQuestionImage()">
+                                        <i class="bi bi-trash3 me-1"></i>Удалить изображение
+                                    </button>
+                                </div>
+                                <div class="position-relative d-inline-block text-center">
+                                    <img id="imagePreviewElement" src="@(Model.ImageUrl ?? "")" alt="Превью" class="img-fluid rounded border shadow-sm" style="max-height: 280px; object-fit: contain;" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Текстовый эталон -->
-                    <div id="blockTestText" class="p-3 bg-light rounded border mb-3" style="display: none;">
-                        <div class="mb-2">
-                            <label asp-for="CorrectTextAnswer" class="form-label small">Правильный ответ</label>
-                            <input asp-for="CorrectTextAnswer" class="form-control" />
+                    <div id="blockTestText" class="p-3 bg-light rounded border mb-4" style="display: none;">
+                        <h6 class="fw-bold mb-2"><i class="bi bi-input-cursor-text me-1 text-primary"></i>Настройка правильного ответа</h6>
+                        <div class="mb-3">
+                            <label asp-for="CorrectTextAnswer" class="form-label small fw-semibold">Эталонный ответ</label>
+                            <input asp-for="CorrectTextAnswer" class="form-control" placeholder="Точное слово или фраза (регистр букв не учитывается)" />
                         </div>
                         <div>
-                            <label asp-for="SynonymsCsv" class="form-label small">Допустимые синонимы (через запятую)</label>
-                            <input asp-for="SynonymsCsv" class="form-control" />
+                            <label asp-for="SynonymsCsv" class="form-label small fw-semibold">Допустимые синонимы (через запятую)</label>
+                            <input asp-for="SynonymsCsv" class="form-control" placeholder="вариант1, вариант2, синоним" />
+                            <div class="form-text small">Если студент введёт любое из этих значений, ответ будет зачтён как правильный.</div>
                         </div>
                     </div>
 
                     <!-- Варианты ответов -->
-                    <div id="blockTestOptions" class="p-3 bg-light rounded border mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h6 class="fw-bold mb-0">Варианты ответов:</h6>
+                    <div id="blockTestOptions" class="p-3 bg-light rounded border mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <h6 class="fw-bold mb-0"><i class="bi bi-list-check me-1 text-primary"></i>Варианты ответов:</h6>
+                                <div class="small text-muted" id="optionsHelpText">Отметьте галочкой правильный вариант(ы)</div>
+                            </div>
                             <button type="button" class="btn btn-sm btn-outline-primary" onclick="addTestOptionRow()">
                                 <i class="bi bi-plus-circle me-1"></i> Добавить вариант
                             </button>
                         </div>
 
-                        <div id="testOptionsContainer">
-                            <div class="row g-2 mb-2 test-opt-row align-items-center">
+                        <div id="testOptionsContainer" class="d-grid gap-2">
+                            <div class="row g-2 test-opt-row align-items-center p-2 bg-white rounded border">
                                 <div class="col-auto">
-                                    <input type="checkbox" name="Options[0].IsCorrect" value="true" class="form-check-input correct-test-cb" title="Правильный" />
+                                    <input type="checkbox" name="Options[0].IsCorrect" value="true" class="form-check-input correct-test-cb fs-5" title="Правильный вариант" checked />
                                 </div>
                                 <div class="col">
-                                    <input type="text" name="Options[0].Text" class="form-control form-control-sm" placeholder="Вариант 1" value="Вариант 1" />
+                                    <input type="text" name="Options[0].Text" class="form-control" placeholder="Вариант 1" value="Вариант 1" />
                                 </div>
-                                <div class="col matching-test-col" style="display: none;">
-                                    <input type="text" name="Options[0].MatchingKey" class="form-control form-control-sm" placeholder="Соответствие (правая часть)" />
+                                <div class="col-md-3 matching-test-col" style="display: none;">
+                                    <input type="text" name="Options[0].MatchingKey" class="form-control" placeholder="Соответствие (правая часть)" />
+                                </div>
+                                <div class="col-md-3 opt-img-col" style="display: none;">
+                                    <input type="text" name="Options[0].ImageUrl" class="form-control form-control-sm" placeholder="URL картинки к варианту" />
+                                </div>
+                                <div class="col-auto">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleOptionImg(this)" title="Прикрепить URL картинки к варианту">
+                                        <i class="bi bi-image"></i>
+                                    </button>
+                                </div>
+                                <div class="col-auto">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeOptionRow(this)" title="Удалить вариант">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
                                 </div>
                             </div>
-                            <div class="row g-2 mb-2 test-opt-row align-items-center">
+
+                            <div class="row g-2 test-opt-row align-items-center p-2 bg-white rounded border">
                                 <div class="col-auto">
-                                    <input type="checkbox" name="Options[1].IsCorrect" value="true" class="form-check-input correct-test-cb" title="Правильный" />
+                                    <input type="checkbox" name="Options[1].IsCorrect" value="true" class="form-check-input correct-test-cb fs-5" title="Правильный вариант" />
                                 </div>
                                 <div class="col">
-                                    <input type="text" name="Options[1].Text" class="form-control form-control-sm" placeholder="Вариант 2" value="Вариант 2" />
+                                    <input type="text" name="Options[1].Text" class="form-control" placeholder="Вариант 2" value="Вариант 2" />
                                 </div>
-                                <div class="col matching-test-col" style="display: none;">
-                                    <input type="text" name="Options[1].MatchingKey" class="form-control form-control-sm" placeholder="Соответствие (правая часть)" />
+                                <div class="col-md-3 matching-test-col" style="display: none;">
+                                    <input type="text" name="Options[1].MatchingKey" class="form-control" placeholder="Соответствие (правая часть)" />
+                                </div>
+                                <div class="col-md-3 opt-img-col" style="display: none;">
+                                    <input type="text" name="Options[1].ImageUrl" class="form-control form-control-sm" placeholder="URL картинки к варианту" />
+                                </div>
+                                <div class="col-auto">
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleOptionImg(this)" title="Прикрепить URL картинки к варианту">
+                                        <i class="bi bi-image"></i>
+                                    </button>
+                                </div>
+                                <div class="col-auto">
+                                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeOptionRow(this)" title="Удалить вариант">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -89,8 +191,8 @@
 
                     <div class="d-flex justify-content-between align-items-center border-top pt-3">
                         <a asp-action="EditTest" asp-route-lectureId="@test?.LectureId" class="btn btn-outline-secondary">Отмена</a>
-                        <button type="submit" class="btn btn-primary px-4">
-                            <i class="bi bi-check2 me-1"></i> Добавить вопрос
+                        <button type="submit" class="btn btn-primary px-4 fw-semibold shadow-sm">
+                            <i class="bi bi-check2 me-1"></i> Сохранить вопрос в тест
                         </button>
                     </div>
                 </form>
@@ -109,6 +211,7 @@
             const blockOptions = document.getElementById("blockTestOptions");
             const matchingCols = document.querySelectorAll(".matching-test-col");
             const correctCbs = document.querySelectorAll(".correct-test-cb");
+            const helpText = document.getElementById("optionsHelpText");
 
             if (type === "ShortText" || type === "FillBlank") {
                 blockText.style.display = "block";
@@ -118,11 +221,17 @@
                 blockOptions.style.display = "block";
                 matchingCols.forEach(c => c.style.display = "block");
                 correctCbs.forEach(cb => cb.parentElement.style.display = "none");
+                if (helpText) helpText.innerText = "Заполните левую часть (понятие) и правую часть (соответствие)";
             } else {
                 blockText.style.display = "none";
                 blockOptions.style.display = "block";
                 matchingCols.forEach(c => c.style.display = "none");
                 correctCbs.forEach(cb => cb.parentElement.style.display = "block");
+                if (helpText) {
+                    helpText.innerText = type === "SingleChoice" 
+                        ? "Отметьте один правильный вариант" 
+                        : "Отметьте один или несколько правильных вариантов";
+                }
             }
         }
 
@@ -132,21 +241,174 @@
             const isMatching = type === "Matching";
 
             const div = document.createElement("div");
-            div.className = "row g-2 mb-2 test-opt-row align-items-center";
+            div.className = "row g-2 test-opt-row align-items-center p-2 bg-white rounded border";
             div.innerHTML = `
                 <div class="col-auto" style="${isMatching ? 'display:none;' : ''}">
-                    <input type="checkbox" name="Options[${testOptionIndex}].IsCorrect" value="true" class="form-check-input correct-test-cb" />
+                    <input type="checkbox" name="Options[${testOptionIndex}].IsCorrect" value="true" class="form-check-input correct-test-cb fs-5" />
                 </div>
                 <div class="col">
-                    <input type="text" name="Options[${testOptionIndex}].Text" class="form-control form-control-sm" placeholder="Вариант ${testOptionIndex + 1}" />
+                    <input type="text" name="Options[${testOptionIndex}].Text" class="form-control" placeholder="Вариант ${testOptionIndex + 1}" />
                 </div>
-                <div class="col matching-test-col" style="${isMatching ? 'display:block;' : 'display:none;'}">
-                    <input type="text" name="Options[${testOptionIndex}].MatchingKey" class="form-control form-control-sm" placeholder="Соответствие (правая часть)" />
+                <div class="col-md-3 matching-test-col" style="${isMatching ? 'display:block;' : 'display:none;'}">
+                    <input type="text" name="Options[${testOptionIndex}].MatchingKey" class="form-control" placeholder="Соответствие (правая часть)" />
+                </div>
+                <div class="col-md-3 opt-img-col" style="display: none;">
+                    <input type="text" name="Options[${testOptionIndex}].ImageUrl" class="form-control form-control-sm" placeholder="URL картинки к варианту" />
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="toggleOptionImg(this)" title="Прикрепить URL картинки к варианту">
+                        <i class="bi bi-image"></i>
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeOptionRow(this)" title="Удалить вариант">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </div>
             `;
             container.appendChild(div);
             testOptionIndex++;
         }
+
+        function removeOptionRow(btn) {
+            const rows = document.querySelectorAll(".test-opt-row");
+            if (rows.length <= 1) {
+                alert("Вопрос должен содержать хотя бы один вариант ответа!");
+                return;
+            }
+            btn.closest(".test-opt-row").remove();
+        }
+
+        function toggleOptionImg(btn) {
+            const row = btn.closest(".test-opt-row");
+            const col = row.querySelector(".opt-img-col");
+            if (col.style.display === "none") {
+                col.style.display = "block";
+                col.querySelector("input").focus();
+            } else {
+                col.style.display = "none";
+            }
+        }
+
+        // --- УПРАВЛЕНИЕ ИЗОБРАЖЕНИЕМ ВОПРОСА (TESTPAD STYLE) ---
+        function toggleUrlInput() {
+            const container = document.getElementById("imageUrlContainer");
+            const btnText = document.getElementById("toggleUrlBtnText");
+            if (container.style.display === "none") {
+                container.style.display = "block";
+                btnText.innerText = "Скрыть ссылку";
+                document.getElementById("questionImageUrlInput").focus();
+            } else {
+                container.style.display = "none";
+                btnText.innerText = "Указать ссылку (URL)";
+            }
+        }
+
+        function handleImageFileSelected(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    showPreview(e.target.result, file.name);
+                };
+                reader.readAsDataURL(file);
+                document.getElementById("removeImageFlag").value = "false";
+            }
+        }
+
+        function handleImageUrlInput(url) {
+            if (url && url.trim().length > 0) {
+                showPreview(url.trim(), "По внешней ссылке");
+                document.getElementById("removeImageFlag").value = "false";
+            } else {
+                if (!document.getElementById("questionImageFileInput").files.length) {
+                    hidePreview();
+                }
+            }
+        }
+
+        function showPreview(src, label) {
+            const previewContainer = document.getElementById("imagePreviewContainer");
+            const previewElement = document.getElementById("imagePreviewElement");
+            const badge = document.getElementById("imagePreviewBadge");
+            previewElement.src = src;
+            if (label) badge.innerHTML = `<i class="bi bi-check2-circle me-1"></i>${label}`;
+            previewContainer.style.display = "block";
+        }
+
+        function hidePreview() {
+            const previewContainer = document.getElementById("imagePreviewContainer");
+            const previewElement = document.getElementById("imagePreviewElement");
+            previewElement.src = "";
+            previewContainer.style.display = "none";
+        }
+
+        function removeQuestionImage() {
+            document.getElementById("questionImageFileInput").value = "";
+            const urlInput = document.getElementById("questionImageUrlInput");
+            if (urlInput) urlInput.value = "";
+            document.getElementById("removeImageFlag").value = "true";
+            hidePreview();
+        }
+
+        // --- DRAG & DROP НА ЗОНУ ВСТАВКИ ---
+        const dropZone = document.getElementById("imageDropZone");
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.add("border-primary", "bg-primary-subtle");
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                dropZone.classList.remove("border-primary", "bg-primary-subtle");
+            }, false);
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            if (dt && dt.files && dt.files.length > 0) {
+                const file = dt.files[0];
+                if (file.type.startsWith("image/")) {
+                    const input = document.getElementById("questionImageFileInput");
+                    input.files = dt.files;
+                    handleImageFileSelected(input);
+                } else {
+                    alert("Пожалуйста, перетащите файл изображения (PNG, JPG, WebP, GIF, SVG).");
+                }
+            }
+        }, false);
+
+        // --- ГЛОБАЛЬНАЯ ВСТАВКА ИЗ БУФЕРА ОБМЕНА (Ctrl + V КАК В TESTPAD) ---
+        window.addEventListener('paste', (e) => {
+            // Если фокус на обычном текстовом поле, проверяем, есть ли изображение в буфере
+            const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf("image") !== -1) {
+                    const blob = items[i].getAsFile();
+                    if (blob) {
+                        e.preventDefault();
+                        const file = new File([blob], `screenshot_${new Date().getTime()}.png`, { type: blob.type });
+                        const dt = new DataTransfer();
+                        dt.items.add(file);
+                        const input = document.getElementById("questionImageFileInput");
+                        input.files = dt.files;
+                        handleImageFileSelected(input);
+
+                        // Мягко подсвечиваем превью и скроллим к нему
+                        const preview = document.getElementById("imagePreviewContainer");
+                        preview.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        preview.classList.add("border-success");
+                        setTimeout(() => preview.classList.remove("border-success"), 1500);
+                        break;
+                    }
+                }
+            }
+        });
 
         switchTestQType();
     </script>

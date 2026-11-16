@@ -202,10 +202,11 @@ public class QuestionCreateEditViewModel
 {
     public int Id { get; set; }
     public int LectureId { get; set; }
+    public int TestId { get; set; }
     public string LectureTitle { get; set; } = string.Empty;
 
     [Required(ErrorMessage = "Введите текст вопроса")]
-    [Display(Name = "Текст контрольного вопроса")]
+    [Display(Name = "Текст вопроса")]
     public string Text { get; set; } = string.Empty;
 
     [Display(Name = "Тип вопроса")]
@@ -213,6 +214,17 @@ public class QuestionCreateEditViewModel
 
     [Display(Name = "Порядковый номер")]
     public int OrderIndex { get; set; } = 1;
+
+    [Display(Name = "Количество баллов")]
+    public int Points { get; set; } = 1;
+
+    [Display(Name = "Изображение к вопросу")]
+    public string? ImageUrl { get; set; }
+
+    [Display(Name = "Файл изображения")]
+    public IFormFile? ImageFile { get; set; }
+
+    public bool RemoveImage { get; set; }
 
     [Display(Name = "Пояснение / подсказка")]
     public string? Explanation { get; set; }
@@ -234,6 +246,7 @@ public class QuestionOptionInputDto
     public bool IsCorrect { get; set; }
     public string? MatchingKey { get; set; }
     public int OrderIndex { get; set; }
+    public string? ImageUrl { get; set; }
 }
 
 public class TestEditViewModel
@@ -280,6 +293,7 @@ public class TestQuestionSummaryDto
     public int Points { get; set; }
     public int OrderIndex { get; set; }
     public int OptionsCount { get; set; }
+    public string? ImageUrl { get; set; }
 }
 
 public class TeacherStudentsPageViewModel

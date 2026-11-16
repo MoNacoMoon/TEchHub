@@ -718,12 +718,23 @@ public class TeacherController : Controller
     {
         if (!ModelState.IsValid) return View(model);
 
+        string? imgUrl = null;
+        if (model.ImageFile != null && model.ImageFile.Length > 0)
+        {
+            imgUrl = await SaveQuestionImageAsync(model.ImageFile);
+        }
+        else if (!string.IsNullOrWhiteSpace(model.ImageUrl))
+        {
+            imgUrl = model.ImageUrl.Trim();
+        }
+
         var cq = new ControlQuestion
         {
             LectureId = model.LectureId,
             Text = model.Text.Trim(),
             Type = model.Type,
             OrderIndex = model.OrderIndex,
+            ImageUrl = imgUrl,
             Explanation = model.Explanation?.Trim(),
             CorrectTextAnswer = model.CorrectTextAnswer?.Trim(),
             SynonymsCsv = model.SynonymsCsv?.Trim()
@@ -735,14 +746,15 @@ public class TeacherController : Controller
         if (model.Options != null && (model.Type == QuestionType.SingleChoice || model.Type == QuestionType.MultipleChoice || model.Type == QuestionType.Matching))
         {
             int idx = 1;
-            foreach (var opt in model.Options.Where(o => !string.IsNullOrWhiteSpace(o.Text)))
+            foreach (var opt in model.Options.Where(o => !string.IsNullOrWhiteSpace(o.Text) || !string.IsNullOrWhiteSpace(o.ImageUrl)))
             {
                 _db.ControlQuestionOptions.Add(new ControlQuestionOption
                 {
                     ControlQuestionId = cq.Id,
-                    Text = opt.Text.Trim(),
+                    Text = opt.Text?.Trim() ?? string.Empty,
                     IsCorrect = opt.IsCorrect,
                     MatchingKey = opt.MatchingKey?.Trim(),
+                    ImageUrl = opt.ImageUrl?.Trim(),
                     OrderIndex = idx++
                 });
             }
@@ -820,7 +832,8 @@ public class TeacherController : Controller
                 Type = q.Type,
                 Points = q.Points,
                 OrderIndex = q.OrderIndex,
-                OptionsCount = q.Options.Count
+                OptionsCount = q.Options.Count,
+                ImageUrl = q.ImageUrl
             }).ToList()
         };
 
@@ -867,6 +880,59 @@ public class TeacherController : Controller
         return View(test);
     }
 
+    private async Task<string?> SaveQuestionImageAsync(IFormFile? file)
+    {
+        if (file == null || file.Length == 0) return null;
+
+        var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg" };
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!allowedExtensions.Contains(ext)) return null;
+
+        if (file.Length > 15 * 1024 * 1024) return null;
+
+        var uniqueFileName = $"q_{Guid.NewGuid():N}{ext}";
+        var uploadsDir = Path.Combine(_env.WebRootPath, "uploads");
+        if (!Directory.Exists(uploadsDir)) Directory.CreateDirectory(uploadsDir);
+
+        var targetPath = Path.Combine(uploadsDir, uniqueFileName);
+        using (var stream = new FileStream(targetPath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        if (Directory.Exists("/data"))
+        {
+            try
+            {
+                var persistentUploads = "/data/uploads";
+                if (!Directory.Exists(persistentUploads)) Directory.CreateDirectory(persistentUploads);
+                var pPath = Path.Combine(persistentUploads, uniqueFileName);
+                System.IO.File.Copy(targetPath, pPath, true);
+            }
+            catch { }
+        }
+
+        return $"/uploads/{uniqueFileName}";
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> UploadTestImage(IFormFile? file)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new { success = false, message = "Файл не выбран" });
+        }
+
+        var url = await SaveQuestionImageAsync(file);
+        if (string.IsNullOrEmpty(url))
+        {
+            return BadRequest(new { success = false, message = "Недопустимый формат или размер (разрешены PNG, JPG, GIF, WebP, SVG до 15 МБ)" });
+        }
+
+        return Json(new { success = true, url });
+    }
+
     [HttpGet]
     public async Task<IActionResult> CreateTestQuestion(int testId)
     {
@@ -879,9 +945,11 @@ public class TeacherController : Controller
         var model = new QuestionCreateEditViewModel
         {
             Id = 0,
+            TestId = testId,
             LectureId = test.LectureId,
             LectureTitle = test.Title,
             OrderIndex = maxOrder + 1,
+            Points = 1,
             Type = QuestionType.SingleChoice,
             Options = new List<QuestionOptionInputDto>
             {
@@ -907,13 +975,24 @@ public class TeacherController : Controller
             return View(model);
         }
 
+        string? imgUrl = null;
+        if (model.ImageFile != null && model.ImageFile.Length > 0)
+        {
+            imgUrl = await SaveQuestionImageAsync(model.ImageFile);
+        }
+        else if (!string.IsNullOrWhiteSpace(model.ImageUrl))
+        {
+            imgUrl = model.ImageUrl.Trim();
+        }
+
         var tq = new TestQuestion
         {
             TestId = testId,
             Text = model.Text.Trim(),
             Type = model.Type,
             OrderIndex = model.OrderIndex,
-            Points = 1,
+            Points = model.Points > 0 ? model.Points : 1,
+            ImageUrl = imgUrl,
             CorrectTextAnswer = model.CorrectTextAnswer?.Trim(),
             SynonymsCsv = model.SynonymsCsv?.Trim()
         };
@@ -924,14 +1003,15 @@ public class TeacherController : Controller
         if (model.Options != null && (model.Type == QuestionType.SingleChoice || model.Type == QuestionType.MultipleChoice || model.Type == QuestionType.Matching))
         {
             int idx = 1;
-            foreach (var opt in model.Options.Where(o => !string.IsNullOrWhiteSpace(o.Text)))
+            foreach (var opt in model.Options.Where(o => !string.IsNullOrWhiteSpace(o.Text) || !string.IsNullOrWhiteSpace(o.ImageUrl)))
             {
                 _db.TestQuestionOptions.Add(new TestQuestionOption
                 {
                     TestQuestionId = tq.Id,
-                    Text = opt.Text.Trim(),
+                    Text = opt.Text?.Trim() ?? string.Empty,
                     IsCorrect = opt.IsCorrect,
                     MatchingKey = opt.MatchingKey?.Trim(),
+                    ImageUrl = opt.ImageUrl?.Trim(),
                     OrderIndex = idx++
                 });
             }
@@ -940,6 +1020,111 @@ public class TeacherController : Controller
 
         TempData["SuccessMessage"] = "Вопрос теста добавлен";
         return RedirectToAction(nameof(EditTest), new { lectureId = test.LectureId });
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> EditTestQuestion(int id)
+    {
+        var q = await _db.TestQuestions
+            .Include(tq => tq.Test)
+                .ThenInclude(t => t.Lecture)
+            .Include(tq => tq.Options)
+            .FirstOrDefaultAsync(tq => tq.Id == id);
+
+        if (q == null) return NotFound("Вопрос теста не найден");
+
+        ViewBag.Test = q.Test;
+        var model = new QuestionCreateEditViewModel
+        {
+            Id = q.Id,
+            TestId = q.TestId,
+            LectureId = q.Test.LectureId,
+            LectureTitle = q.Test.Title,
+            Text = q.Text,
+            Type = q.Type,
+            OrderIndex = q.OrderIndex,
+            Points = q.Points,
+            ImageUrl = q.ImageUrl,
+            CorrectTextAnswer = q.CorrectTextAnswer,
+            SynonymsCsv = q.SynonymsCsv,
+            Options = q.Options.OrderBy(o => o.OrderIndex).Select(o => new QuestionOptionInputDto
+            {
+                Id = o.Id,
+                Text = o.Text,
+                IsCorrect = o.IsCorrect,
+                MatchingKey = o.MatchingKey,
+                OrderIndex = o.OrderIndex,
+                ImageUrl = o.ImageUrl
+            }).ToList()
+        };
+
+        return View(model);
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> EditTestQuestion(int id, QuestionCreateEditViewModel model)
+    {
+        var q = await _db.TestQuestions
+            .Include(tq => tq.Test)
+            .Include(tq => tq.Options)
+            .FirstOrDefaultAsync(tq => tq.Id == id);
+
+        if (q == null) return NotFound("Вопрос теста не найден");
+
+        if (string.IsNullOrWhiteSpace(model.Text))
+        {
+            ModelState.AddModelError("Text", "Введите текст вопроса");
+            ViewBag.Test = q.Test;
+            return View(model);
+        }
+
+        q.Text = model.Text.Trim();
+        q.Type = model.Type;
+        q.OrderIndex = model.OrderIndex;
+        q.Points = model.Points > 0 ? model.Points : 1;
+        q.CorrectTextAnswer = model.CorrectTextAnswer?.Trim();
+        q.SynonymsCsv = model.SynonymsCsv?.Trim();
+
+        if (model.RemoveImage)
+        {
+            q.ImageUrl = null;
+        }
+        else if (model.ImageFile != null && model.ImageFile.Length > 0)
+        {
+            var newUrl = await SaveQuestionImageAsync(model.ImageFile);
+            if (!string.IsNullOrEmpty(newUrl))
+            {
+                q.ImageUrl = newUrl;
+            }
+        }
+        else if (!string.IsNullOrWhiteSpace(model.ImageUrl))
+        {
+            q.ImageUrl = model.ImageUrl.Trim();
+        }
+
+        _db.TestQuestionOptions.RemoveRange(q.Options);
+
+        if (model.Options != null && (model.Type == QuestionType.SingleChoice || model.Type == QuestionType.MultipleChoice || model.Type == QuestionType.Matching))
+        {
+            int idx = 1;
+            foreach (var opt in model.Options.Where(o => !string.IsNullOrWhiteSpace(o.Text) || !string.IsNullOrWhiteSpace(o.ImageUrl)))
+            {
+                _db.TestQuestionOptions.Add(new TestQuestionOption
+                {
+                    TestQuestionId = q.Id,
+                    Text = opt.Text?.Trim() ?? string.Empty,
+                    IsCorrect = opt.IsCorrect,
+                    MatchingKey = opt.MatchingKey?.Trim(),
+                    ImageUrl = opt.ImageUrl?.Trim(),
+                    OrderIndex = idx++
+                });
+            }
+        }
+
+        await _db.SaveChangesAsync();
+        TempData["SuccessMessage"] = "Вопрос теста сохранен";
+        return RedirectToAction(nameof(EditTest), new { lectureId = q.Test.LectureId });
     }
 
     [HttpPost]

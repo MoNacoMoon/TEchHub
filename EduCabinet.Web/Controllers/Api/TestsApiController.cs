@@ -93,11 +93,13 @@ public class TestsApiController : ControllerBase
                     Text = q.Text,
                     Type = q.Type,
                     Points = q.Points,
+                    ImageUrl = q.ImageUrl,
                     Options = options.Select(o => new OptionDto
                     {
                         Id = o.Id,
                         Text = o.Text,
-                        MatchingKey = o.MatchingKey
+                        MatchingKey = o.MatchingKey,
+                        ImageUrl = o.ImageUrl
                     }).ToList()
                 };
 

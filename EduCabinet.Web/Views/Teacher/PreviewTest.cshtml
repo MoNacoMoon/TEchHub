@@ -99,6 +99,20 @@
             <div class="card-body p-4">
                 <h6 class="fw-bold mb-3">@q.Text</h6>
 
+                @if (!string.IsNullOrEmpty(q.ImageUrl))
+                {
+                    <div class="mb-3 text-start">
+                        <a href="@q.ImageUrl" target="_blank" class="test-img-zoom-btn text-decoration-none d-inline-block" onclick="openImageModal('@q.ImageUrl'); return false;">
+                            <div class="position-relative d-inline-block rounded border p-1 bg-light shadow-sm">
+                                <img src="@q.ImageUrl" alt="Иллюстрация к вопросу" class="img-fluid rounded" style="max-height: 350px; max-width: 100%; object-fit: contain;" />
+                                <span class="badge bg-dark bg-opacity-75 position-absolute bottom-0 end-0 m-2">
+                                    <i class="bi bi-zoom-in me-1"></i>Увеличить
+                                </span>
+                            </div>
+                        </a>
+                    </div>
+                }
+
                 @if (q.Type == QuestionType.SingleChoice || q.Type == QuestionType.MultipleChoice)
                 {
                     <div class="list-group">
@@ -107,6 +121,10 @@
                             <div class="list-group-item d-flex justify-content-between align-items-center @(opt.IsCorrect ? "answer-correct-highlight list-group-item-success" : "")">
                                 <div class="d-flex align-items-center gap-2">
                                     <i class="bi @(q.Type == QuestionType.SingleChoice ? "bi-circle" : "bi-square") text-muted"></i>
+                                    @if (!string.IsNullOrEmpty(opt.ImageUrl))
+                                    {
+                                        <img src="@opt.ImageUrl" alt="Вариант" class="rounded border me-1" style="width: 40px; height: 40px; object-fit: cover;" />
+                                    }
                                     <span>@opt.Text</span>
                                 </div>
                                 @if (opt.IsCorrect)
@@ -170,7 +188,29 @@
     }
 </div>
 
+<!-- Модальное окно для полноразмерного просмотра изображения -->
+<div class="modal fade" id="imageZoomModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 bg-transparent">
+            <div class="modal-header border-0 pb-0 justify-content-end">
+                <button type="button" class="btn btn-dark btn-sm rounded-circle shadow" data-bs-dismiss="modal" aria-label="Закрыть">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body p-2 text-center">
+                <img id="zoomedModalImage" src="" alt="Увеличенное изображение" class="img-fluid rounded shadow-lg bg-white p-1" style="max-height: 85vh; object-fit: contain;" />
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+    function openImageModal(url) {
+        document.getElementById('zoomedModalImage').src = url;
+        const modal = new bootstrap.Modal(document.getElementById('imageZoomModal'));
+        modal.show();
+    }
+
     let answersVisible = true;
     function toggleAnswers() {
         answersVisible = !answersVisible;

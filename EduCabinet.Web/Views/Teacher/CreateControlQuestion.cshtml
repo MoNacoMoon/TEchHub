@@ -11,7 +11,7 @@
                 <div class="text-muted small">Лекция: @Model.LectureTitle</div>
             </div>
             <div class="card-body p-4">
-                <form asp-action="CreateControlQuestion" method="post" id="qForm">
+                <form asp-action="CreateControlQuestion" method="post" enctype="multipart/form-data" id="qForm">
                     @Html.AntiForgeryToken()
                     <input type="hidden" asp-for="LectureId" />
                     <input type="hidden" asp-for="LectureTitle" />
@@ -40,6 +40,47 @@
                         <label asp-for="Text" class="form-label fw-semibold">Текст вопроса или задания</label>
                         <textarea asp-for="Text" class="form-control" rows="3" placeholder="Введите формулировку вопроса..." autofocus></textarea>
                         <span asp-validation-for="Text" class="text-danger small"></span>
+                    </div>
+
+                    <!-- Блок прикрепления изображения (в стиле TestPad) -->
+                    <div class="card bg-light border mb-3">
+                        <div class="card-header bg-transparent py-2 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <span class="fw-semibold small text-body">
+                                <i class="bi bi-image text-primary me-1"></i>Изображение к вопросу
+                            </span>
+                            <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 small" onclick="toggleCtrlUrlInput()">
+                                <i class="bi bi-link-45deg"></i> <span id="toggleCtrlUrlText">Указать ссылку (URL)</span>
+                            </button>
+                        </div>
+                        <div class="card-body p-3">
+                            <input type="file" asp-for="ImageFile" id="ctrlImageFileInput" accept="image/*" class="d-none" onchange="handleCtrlImageFileSelected(this)" />
+                            <input type="hidden" asp-for="RemoveImage" id="ctrlRemoveImageFlag" value="false" />
+
+                            <div id="ctrlImageDropZone" class="testpad-dropzone p-3 text-center border border-2 border-dashed rounded-3 cursor-pointer bg-white" onclick="document.getElementById('ctrlImageFileInput').click()">
+                                <i class="bi bi-cloud-arrow-up fs-2 text-primary d-block mb-1"></i>
+                                <div class="fw-bold small mb-1">Нажмите для выбора файла или перетащите изображение сюда</div>
+                                <div class="text-muted small" style="font-size: 0.75rem;">PNG, JPG, JPEG, GIF, WebP, SVG (до 15 МБ) | Или нажмите Ctrl+V</div>
+                            </div>
+
+                            <div id="ctrlImageUrlContainer" class="mt-2" style="display: none;">
+                                <div class="input-group input-group-sm">
+                                    <span class="input-group-text"><i class="bi bi-globe"></i></span>
+                                    <input asp-for="ImageUrl" id="ctrlImageUrlInput" class="form-control" placeholder="https://... или /uploads/..." oninput="handleCtrlImageUrlInput(this.value)" />
+                                </div>
+                            </div>
+
+                            <div id="ctrlImagePreviewContainer" class="mt-3 p-2 bg-white rounded border text-center" style="@(string.IsNullOrEmpty(Model.ImageUrl) ? "display: none;" : "")">
+                                <div class="d-flex justify-content-between align-items-center mb-2 px-1">
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle" id="ctrlImagePreviewBadge">
+                                        <i class="bi bi-check2-circle me-1"></i>Изображение прикреплено
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-outline-danger py-0 px-2" onclick="removeCtrlQuestionImage()">
+                                        <i class="bi bi-trash3 me-1"></i>Удалить
+                                    </button>
+                                </div>
+                                <img id="ctrlImagePreviewElement" src="@(Model.ImageUrl ?? "")" alt="Превью" class="img-fluid rounded border shadow-sm" style="max-height: 250px; object-fit: contain;" />
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -168,6 +209,66 @@
             `;
             container.appendChild(div);
             optionIndex++;
+        }
+
+        function toggleCtrlUrlInput() {
+            const container = document.getElementById("ctrlImageUrlContainer");
+            const btnText = document.getElementById("toggleCtrlUrlText");
+            if (container.style.display === "none") {
+                container.style.display = "block";
+                btnText.innerText = "Скрыть ссылку";
+                document.getElementById("ctrlImageUrlInput").focus();
+            } else {
+                container.style.display = "none";
+                btnText.innerText = "Указать ссылку (URL)";
+            }
+        }
+
+        function handleCtrlImageFileSelected(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    showCtrlPreview(e.target.result, file.name);
+                };
+                reader.readAsDataURL(file);
+                document.getElementById("ctrlRemoveImageFlag").value = "false";
+            }
+        }
+
+        function handleCtrlImageUrlInput(url) {
+            if (url && url.trim().length > 0) {
+                showCtrlPreview(url.trim(), "По внешней ссылке");
+                document.getElementById("ctrlRemoveImageFlag").value = "false";
+            } else {
+                if (!document.getElementById("ctrlImageFileInput").files.length) {
+                    hideCtrlPreview();
+                }
+            }
+        }
+
+        function showCtrlPreview(src, label) {
+            const previewContainer = document.getElementById("ctrlImagePreviewContainer");
+            const previewElement = document.getElementById("ctrlImagePreviewElement");
+            const badge = document.getElementById("ctrlImagePreviewBadge");
+            previewElement.src = src;
+            if (label) badge.innerHTML = `<i class="bi bi-check2-circle me-1"></i>${label}`;
+            previewContainer.style.display = "block";
+        }
+
+        function hideCtrlPreview() {
+            const previewContainer = document.getElementById("ctrlImagePreviewContainer");
+            const previewElement = document.getElementById("ctrlImagePreviewElement");
+            previewElement.src = "";
+            previewContainer.style.display = "none";
+        }
+
+        function removeCtrlQuestionImage() {
+            document.getElementById("ctrlImageFileInput").value = "";
+            const urlInput = document.getElementById("ctrlImageUrlInput");
+            if (urlInput) urlInput.value = "";
+            document.getElementById("ctrlRemoveImageFlag").value = "true";
+            hideCtrlPreview();
         }
 
         // Инициализация отображения

@@ -60,13 +60,31 @@
                 <div class="card-body p-4">
                     <h5 class="fw-bold mb-3 text-body">@q.Text</h5>
 
+                    @if (!string.IsNullOrEmpty(q.ImageUrl))
+                    {
+                        <div class="mb-3 text-start">
+                            <a href="@q.ImageUrl" target="_blank" class="test-img-zoom-btn text-decoration-none d-inline-block" onclick="openTestImageModal('@q.ImageUrl'); return false;">
+                                <div class="position-relative d-inline-block rounded border p-1 bg-light shadow-sm">
+                                    <img src="@q.ImageUrl" alt="Иллюстрация к заданию" class="img-fluid rounded" style="max-height: 380px; max-width: 100%; object-fit: contain;" />
+                                    <span class="badge bg-dark bg-opacity-75 position-absolute bottom-0 end-0 m-2">
+                                        <i class="bi bi-zoom-in me-1"></i>Увеличить
+                                    </span>
+                                </div>
+                            </a>
+                        </div>
+                    }
+
                     @if (q.Type == QuestionType.SingleChoice)
                     {
                         <div class="mb-2 d-grid gap-2">
                             @foreach (var opt in q.Options)
                             {
                                 <label class="card p-3 border rounded-3 mb-1 text-body cursor-pointer d-flex flex-row align-items-center gap-3 option-label-hover" for="opt_@(q.Id)_@(opt.Id)">
-                                    <input class="form-check-input mt-0 fs-5" type="radio" name="Answers[@q.Id]" id="opt_@(q.Id)_@(opt.Id)" value="@opt.Id" />
+                                    <input class="form-check-input mt-0 fs-5 flex-shrink-0" type="radio" name="Answers[@q.Id]" id="opt_@(q.Id)_@(opt.Id)" value="@opt.Id" />
+                                    @if (!string.IsNullOrEmpty(opt.ImageUrl))
+                                    {
+                                        <img src="@opt.ImageUrl" alt="Вариант" class="rounded border flex-shrink-0" style="max-width: 90px; max-height: 70px; object-fit: cover;" />
+                                    }
                                     <span class="fs-6">@opt.Text</span>
                                 </label>
                             }
@@ -80,7 +98,11 @@
                                 @foreach (var opt in q.Options)
                                 {
                                     <label class="card p-3 border rounded-3 mb-1 text-body cursor-pointer d-flex flex-row align-items-center gap-3 option-label-hover" for="opt_@(q.Id)_@(opt.Id)">
-                                        <input class="form-check-input mt-0 fs-5 mcq-cb-@q.Id" type="checkbox" id="opt_@(q.Id)_@(opt.Id)" value="@opt.Id" onchange="updateMcqHidden(@q.Id)" />
+                                        <input class="form-check-input mt-0 fs-5 mcq-cb-@q.Id flex-shrink-0" type="checkbox" id="opt_@(q.Id)_@(opt.Id)" value="@opt.Id" onchange="updateMcqHidden(@q.Id)" />
+                                        @if (!string.IsNullOrEmpty(opt.ImageUrl))
+                                        {
+                                            <img src="@opt.ImageUrl" alt="Вариант" class="rounded border flex-shrink-0" style="max-width: 90px; max-height: 70px; object-fit: cover;" />
+                                        }
                                         <span class="fs-6">@opt.Text</span>
                                     </label>
                                 }
@@ -138,8 +160,30 @@
     </div>
 </form>
 
+<!-- Модальное окно для полноразмерного просмотра иллюстрации задания -->
+<div class="modal fade" id="testImageZoomModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content border-0 bg-transparent">
+            <div class="modal-header border-0 pb-0 justify-content-end">
+                <button type="button" class="btn btn-dark btn-sm rounded-circle shadow" data-bs-dismiss="modal" aria-label="Закрыть">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+            <div class="modal-body p-2 text-center">
+                <img id="testZoomedModalImage" src="" alt="Увеличенное изображение задания" class="img-fluid rounded shadow-lg bg-white p-1" style="max-height: 85vh; object-fit: contain;" />
+            </div>
+        </div>
+    </div>
+</div>
+
 @section Scripts {
     <script>
+        function openTestImageModal(url) {
+            document.getElementById('testZoomedModalImage').src = url;
+            const modal = new bootstrap.Modal(document.getElementById('testImageZoomModal'));
+            modal.show();
+        }
+
         function updateMcqHidden(questionId) {
             const checked = Array.from(document.querySelectorAll(`.mcq-cb-${questionId}:checked`)).map(cb => cb.value);
             document.getElementById(`mcq_hidden_${questionId}`).value = checked.join(',');
