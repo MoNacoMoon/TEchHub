@@ -829,6 +829,7 @@ public class StudentController : Controller
         var attempt = await _db.TestAttempts
             .Include(a => a.Test)
                 .ThenInclude(t => t.Lecture)
+                    .ThenInclude(l => l.Topic)
             .Include(a => a.Answers)
                 .ThenInclude(ans => ans.Question)
                     .ThenInclude(q => q.Options)
@@ -842,48 +843,66 @@ public class StudentController : Controller
         int totalAttemptsUsed = await _db.TestAttempts.CountAsync(a => a.StudentId == studentId && a.TestId == attempt.TestId);
         int remaining = Math.Max(0, attempt.Test.MaxAttempts - totalAttemptsUsed);
 
-        // Проверяем, открылась ли следующая лекция
-        var allDisciplineLectures = await _db.Lectures
-            .Include(l => l.Topic)
-            .Where(l => l.Topic.DisciplineId == attempt.Test.Lecture.Topic.DisciplineId)
-            .OrderBy(l => l.Topic.OrderIndex)
-            .ThenBy(l => l.Topic.Id)
-            .ThenBy(l => l.OrderIndex)
-            .ThenBy(l => l.Id)
-            .Select(l => l.Id)
-            .ToListAsync();
-
-        int currentIndex = allDisciplineLectures.IndexOf(attempt.Test.LectureId);
+        // Проверяем, открылась ли следующая лекция (полная защита от null)
         int? nextLectureId = null;
         bool nextUnlocked = false;
 
-        if (currentIndex >= 0 && currentIndex < allDisciplineLectures.Count - 1)
+        try
         {
-            nextLectureId = allDisciplineLectures[currentIndex + 1];
-            nextUnlocked = await _lectureAccessService.CanStudentAccessLectureAsync(studentId, nextLectureId.Value);
+            int? disciplineId = attempt.Test.Lecture?.Topic?.DisciplineId;
+            if (!disciplineId.HasValue && attempt.Test?.Lecture != null)
+            {
+                disciplineId = await _db.Topics
+                    .Where(t => t.Id == attempt.Test.Lecture.TopicId)
+                    .Select(t => (int?)t.DisciplineId)
+                    .FirstOrDefaultAsync();
+            }
+
+            if (disciplineId.HasValue)
+            {
+                var allDisciplineLectures = await _db.Lectures
+                    .Where(l => l.Topic.DisciplineId == disciplineId.Value)
+                    .OrderBy(l => l.Topic.OrderIndex)
+                    .ThenBy(l => l.Topic.Id)
+                    .ThenBy(l => l.OrderIndex)
+                    .ThenBy(l => l.Id)
+                    .Select(l => l.Id)
+                    .ToListAsync();
+
+                int currentIndex = allDisciplineLectures.IndexOf(attempt.Test?.LectureId ?? 0);
+                if (currentIndex >= 0 && currentIndex < allDisciplineLectures.Count - 1)
+                {
+                    nextLectureId = allDisciplineLectures[currentIndex + 1];
+                    nextUnlocked = await _lectureAccessService.CanStudentAccessLectureAsync(studentId, nextLectureId.Value);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            await _eventLogger.LogActionAsync(studentId, "TEST_RESULT_NEXT_LECTURE_WARN", $"Предупреждение при определении следующей лекции: {ex.Message}");
         }
 
         var model = new TestResultViewModel
         {
             AttemptId = attempt.Id,
             TestId = attempt.TestId,
-            LectureId = attempt.Test.LectureId,
-            LectureTitle = attempt.Test.Lecture.Title,
-            TestTitle = attempt.Test.Title,
+            LectureId = attempt.Test?.LectureId ?? 0,
+            LectureTitle = attempt.Test?.Lecture?.Title ?? "Лекция",
+            TestTitle = attempt.Test?.Title ?? "Тест",
             AttemptNumber = attempt.AttemptNumber,
             TotalQuestions = attempt.TotalQuestions,
             CorrectQuestions = attempt.CorrectQuestions,
             ScorePercent = attempt.ScorePercent,
-            PassingScorePercent = attempt.Test.PassingScorePercent,
+            PassingScorePercent = attempt.Test?.PassingScorePercent ?? 70,
             IsPassed = attempt.IsPassed,
             AttemptsRemaining = remaining,
             NextLectureUnlocked = nextUnlocked,
             NextLectureId = nextLectureId,
             Answers = attempt.Answers.Select(ans => new TestAnswerDetailDto
             {
-                QuestionText = ans.Question.Text,
-                Type = ans.Question.Type,
-                ImageUrl = ans.Question.ImageUrl,
+                QuestionText = ans.Question?.Text ?? "Вопрос",
+                Type = ans.Question?.Type ?? QuestionType.SingleChoice,
+                ImageUrl = ans.Question?.ImageUrl,
                 GivenAnswer = ans.GivenAnswer,
                 IsCorrect = ans.IsCorrect,
                 PointsEarned = ans.PointsEarned
