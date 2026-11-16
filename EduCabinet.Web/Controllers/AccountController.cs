@@ -556,6 +556,7 @@ public class AccountController : Controller
 
     [HttpGet]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     public async Task<IActionResult> ValidateInviteCode(string? code)
     {
         if (string.IsNullOrWhiteSpace(code))
