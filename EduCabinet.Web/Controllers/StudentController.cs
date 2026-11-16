@@ -481,7 +481,10 @@ public class StudentController : Controller
                     Grade = submission.Grade,
                     TeacherFeedback = submission.TeacherFeedback,
                     ReviewedAt = submission.ReviewedAt,
-                    ReviewedByTeacherName = submission.ReviewedByTeacher?.FullName
+                    ReviewedByTeacherName = submission.ReviewedByTeacher?.FullName,
+                    ReviewedFilePath = submission.ReviewedFilePath,
+                    ReviewedFileName = submission.ReviewedFileName,
+                    ReviewedFileSizeBytes = submission.ReviewedFileSizeBytes
                 };
             }
         }
@@ -770,6 +773,175 @@ public class StudentController : Controller
 
         var contentType = submission.ContentType ?? "application/octet-stream";
         return PhysicalFile(filePath, contentType, submission.OriginalFileName);
+    }
+
+    // Скачивание файла с правками от преподавателя
+    [HttpGet]
+    public async Task<IActionResult> DownloadTeacherReviewedFile(int id)
+    {
+        int studentId = GetCurrentStudentId();
+        var submission = await _db.StudentReportSubmissions
+            .Include(s => s.Lecture)
+            .FirstOrDefaultAsync(s => s.Id == id);
+
+        if (submission == null || string.IsNullOrEmpty(submission.ReviewedFilePath)) return NotFound("Файл с правками не найден");
+        if (submission.StudentId != studentId) return Forbid();
+
+        string relativePath = submission.ReviewedFilePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        string filePath = Path.Combine(_env.WebRootPath, relativePath);
+
+        if (!System.IO.File.Exists(filePath) && Directory.Exists("/data"))
+        {
+            string pPath = Path.Combine("/data", relativePath);
+            if (System.IO.File.Exists(pPath)) filePath = pPath;
+        }
+
+        if (!System.IO.File.Exists(filePath))
+        {
+            return NotFound("Файл отсутствует на диске сервера");
+        }
+
+        return PhysicalFile(filePath, "application/octet-stream", submission.ReviewedFileName ?? "Reviewed_File");
+    }
+
+    // Единый трекер отчётов и практических работ студента
+    [HttpGet]
+    public async Task<IActionResult> MyReports(ReportSubmissionStatus? status)
+    {
+        int studentId = GetCurrentStudentId();
+
+        var allSubmissions = await _db.StudentReportSubmissions
+            .Include(r => r.Lecture)
+                .ThenInclude(l => l.Topic)
+                    .ThenInclude(t => t.Discipline)
+            .Include(r => r.ReviewedByTeacher)
+            .Where(r => r.StudentId == studentId)
+            .OrderByDescending(r => r.SubmittedAt)
+            .ToListAsync();
+
+        var filteredReports = status.HasValue
+            ? allSubmissions.Where(r => r.Status == status.Value).ToList()
+            : allSubmissions;
+
+        var vm = new StudentReportsListViewModel
+        {
+            SelectedStatus = status,
+            TotalCount = allSubmissions.Count,
+            PendingCount = allSubmissions.Count(s => s.Status == ReportSubmissionStatus.Pending),
+            NeedsRevisionCount = allSubmissions.Count(s => s.Status == ReportSubmissionStatus.NeedsRevision),
+            ApprovedCount = allSubmissions.Count(s => s.Status == ReportSubmissionStatus.Approved),
+            Reports = filteredReports.Select(r => new StudentReportItemDto
+            {
+                Id = r.Id,
+                LectureId = r.LectureId,
+                LectureTitle = r.Lecture.Title,
+                DisciplineId = r.Lecture.Topic.DisciplineId,
+                DisciplineTitle = r.Lecture.Topic.Discipline.Title,
+                OriginalFileName = r.OriginalFileName,
+                FileSizeBytes = r.FileSizeBytes,
+                StudentComment = r.StudentComment,
+                SubmittedAt = r.SubmittedAt,
+                Status = r.Status,
+                Grade = r.Grade,
+                MaxScore = r.Lecture.MaxReportScore ?? 100,
+                TeacherFeedback = r.TeacherFeedback,
+                ReviewedAt = r.ReviewedAt,
+                ReviewedByTeacherName = r.ReviewedByTeacher?.FullName,
+                ReviewedFilePath = r.ReviewedFilePath,
+                ReviewedFileName = r.ReviewedFileName,
+                ReviewedFileSizeBytes = r.ReviewedFileSizeBytes
+            }).ToList()
+        };
+
+        return View(vm);
+    }
+
+    // Электронная зачётная книжка студента
+    [HttpGet]
+    public async Task<IActionResult> Gradebook()
+    {
+        int studentId = GetCurrentStudentId();
+        var student = await _db.Users
+            .Include(u => u.GroupMemberships)
+                .ThenInclude(gm => gm.Group)
+            .FirstOrDefaultAsync(u => u.Id == studentId);
+
+        if (student == null) return NotFound();
+
+        var groupIds = student.GroupMemberships.Select(gm => gm.GroupId).ToList();
+
+        var disciplines = await _db.Disciplines
+            .Include(d => d.CreatedBy)
+            .Include(d => d.DisciplineGroups)
+            .Include(d => d.Topics)
+                .ThenInclude(t => t.Lectures)
+                    .ThenInclude(l => l.Test)
+            .Where(d => d.IsActive && d.DisciplineGroups.Any(dg => groupIds.Contains(dg.GroupId)))
+            .OrderBy(d => d.Title)
+            .ToListAsync();
+
+        var vm = new StudentGradebookViewModel
+        {
+            StudentFullName = student.FullName,
+            GroupName = student.GroupMemberships.FirstOrDefault()?.Group.Name ?? "Без группы",
+            TotalDisciplinesCount = disciplines.Count,
+            Disciplines = new List<DisciplineGradebookItemDto>()
+        };
+
+        var allAttempts = await _db.TestAttempts
+            .Where(t => t.StudentId == studentId && t.CompletedAt != null)
+            .ToListAsync();
+
+        var allReports = await _db.StudentReportSubmissions
+            .Include(r => r.Lecture)
+            .Where(r => r.StudentId == studentId)
+            .ToListAsync();
+
+        int totalCompletedDisciplines = 0;
+        List<double> subjectAverageScores = new();
+
+        foreach (var d in disciplines)
+        {
+            var prog = await _lectureAccessService.GetDisciplineProgressAsync(studentId, d.Id);
+            if (prog.ProgressPercent >= 100) totalCompletedDisciplines++;
+
+            var dLectureIds = d.Topics.SelectMany(t => t.Lectures.Select(l => l.Id)).ToList();
+            var dTestIds = d.Topics.SelectMany(t => t.Lectures.Where(l => l.Test != null).Select(l => l.Test!.Id)).ToList();
+
+            var dAttempts = allAttempts.Where(a => dTestIds.Contains(a.TestId)).ToList();
+            double? avgScore = dAttempts.Any() ? Math.Round(dAttempts.Average(a => a.ScorePercent), 1) : null;
+            if (avgScore.HasValue) subjectAverageScores.Add(avgScore.Value);
+
+            var dReports = allReports.Where(r => dLectureIds.Contains(r.LectureId)).ToList();
+            var dLecturesWithReports = d.Topics.SelectMany(t => t.Lectures.Where(l => l.RequiresReportSubmission)).ToList();
+
+            var item = new DisciplineGradebookItemDto
+            {
+                DisciplineId = d.Id,
+                Title = d.Title,
+                Description = d.Description,
+                TeacherName = d.CreatedBy?.FullName ?? "Преподаватель",
+                ProgressPercent = prog.ProgressPercent,
+                CompletedLectures = prog.CompletedLectures,
+                TotalLectures = prog.TotalLectures,
+                AverageTestScore = avgScore,
+                TestsPassedCount = dAttempts.Where(a => a.IsPassed).Select(a => a.TestId).Distinct().Count(),
+                TotalTestsCount = dTestIds.Count,
+                ReportsApprovedCount = dReports.Count(r => r.Status == ReportSubmissionStatus.Approved),
+                TotalReportsCount = dLecturesWithReports.Count,
+                TotalReportScoreEarned = dReports.Where(r => r.Status == ReportSubmissionStatus.Approved).Sum(r => r.Grade ?? 0),
+                TotalReportScorePossible = dLecturesWithReports.Sum(l => l.MaxReportScore ?? 100)
+            };
+
+            vm.Disciplines.Add(item);
+        }
+
+        vm.CompletedDisciplinesCount = totalCompletedDisciplines;
+        vm.OverallAverageScore = subjectAverageScores.Any() ? Math.Round(subjectAverageScores.Average(), 1) : 0;
+        vm.TotalTestsPassed = allAttempts.Where(a => a.IsPassed).Select(a => a.TestId).Distinct().Count();
+        vm.TotalReportsApproved = allReports.Count(r => r.Status == ReportSubmissionStatus.Approved);
+
+        return View(vm);
     }
 
     // Отправка ответа на контрольный вопрос (AJAX / POST)

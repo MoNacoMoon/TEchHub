@@ -391,6 +391,9 @@ public class TeacherReportItemViewModel
     public string? TeacherFeedback { get; set; }
     public DateTime? ReviewedAt { get; set; }
     public string? ReviewedByTeacherName { get; set; }
+    public string? ReviewedFilePath { get; set; }
+    public string? ReviewedFileName { get; set; }
+    public long? ReviewedFileSizeBytes { get; set; }
 }
 
 public class GradeReportInputModel
@@ -406,4 +409,6 @@ public class GradeReportInputModel
 
     [StringLength(1000, ErrorMessage = "Отзыв не должен превышать 1000 символов")]
     public string? TeacherFeedback { get; set; }
+
+    public IFormFile? ReviewedFile { get; set; }
 }

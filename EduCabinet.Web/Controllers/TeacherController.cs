@@ -1316,7 +1316,10 @@ public class TeacherController : Controller
                 MaxScore = r.Lecture.MaxReportScore ?? 100,
                 TeacherFeedback = r.TeacherFeedback,
                 ReviewedAt = r.ReviewedAt,
-                ReviewedByTeacherName = r.ReviewedByTeacher?.FullName
+                ReviewedByTeacherName = r.ReviewedByTeacher?.FullName,
+                ReviewedFilePath = r.ReviewedFilePath,
+                ReviewedFileName = r.ReviewedFileName,
+                ReviewedFileSizeBytes = r.ReviewedFileSizeBytes
             }).ToList()
         };
 
@@ -1342,6 +1345,43 @@ public class TeacherController : Controller
         report.TeacherFeedback = model.TeacherFeedback?.Trim();
         report.ReviewedAt = DateTime.UtcNow;
         report.ReviewedByTeacherId = teacherId;
+
+        // Если преподаватель прикрепил проверенный файл с замечаниями / правками
+        if (model.ReviewedFile != null && model.ReviewedFile.Length > 0)
+        {
+            var ext = Path.GetExtension(model.ReviewedFile.FileName).ToLowerInvariant();
+            var forbiddenExts = new[] { ".exe", ".bat", ".cmd", ".sh", ".com", ".msi", ".dll", ".so", ".scr", ".pif", ".vbs", ".js", ".php", ".asp", ".aspx" };
+            if (!forbiddenExts.Contains(ext))
+            {
+                var uploadsReportsDir = Path.Combine(_env.WebRootPath, "uploads", "reports");
+                if (!Directory.Exists(uploadsReportsDir)) Directory.CreateDirectory(uploadsReportsDir);
+
+                var origName = Path.GetFileName(model.ReviewedFile.FileName);
+                var uniqueName = $"t_rev_{Guid.NewGuid():N}_{origName}";
+                var fullPath = Path.Combine(uploadsReportsDir, uniqueName);
+
+                using (var stream = new FileStream(fullPath, FileMode.Create))
+                {
+                    await model.ReviewedFile.CopyToAsync(stream);
+                }
+
+                if (Directory.Exists("/data"))
+                {
+                    try
+                    {
+                        var persistentDir = "/data/uploads/reports";
+                        if (!Directory.Exists(persistentDir)) Directory.CreateDirectory(persistentDir);
+                        var pPath = Path.Combine(persistentDir, uniqueName);
+                        System.IO.File.Copy(fullPath, pPath, true);
+                    }
+                    catch { }
+                }
+
+                report.ReviewedFilePath = $"/uploads/reports/{uniqueName}";
+                report.ReviewedFileName = origName;
+                report.ReviewedFileSizeBytes = model.ReviewedFile.Length;
+            }
+        }
 
         await _db.SaveChangesAsync();
 
@@ -1393,6 +1433,34 @@ public class TeacherController : Controller
 
         var contentType = report.ContentType ?? "application/octet-stream";
         return PhysicalFile(filePath, contentType, report.OriginalFileName);
+    }
+
+    [HttpGet]
+    public async Task<IActionResult> DownloadReviewedTeacherFile(int id)
+    {
+        var report = await _db.StudentReportSubmissions
+            .FirstOrDefaultAsync(r => r.Id == id);
+
+        if (report == null || string.IsNullOrEmpty(report.ReviewedFilePath))
+        {
+            return NotFound("Файл преподавателя с правками не найден");
+        }
+
+        string relativePath = report.ReviewedFilePath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar);
+        string filePath = Path.Combine(_env.WebRootPath, relativePath);
+
+        if (!System.IO.File.Exists(filePath) && Directory.Exists("/data"))
+        {
+            string pPath = Path.Combine("/data", relativePath);
+            if (System.IO.File.Exists(pPath)) filePath = pPath;
+        }
+
+        if (!System.IO.File.Exists(filePath))
+        {
+            return NotFound("Файл отсутствует на диске сервера");
+        }
+
+        return PhysicalFile(filePath, "application/octet-stream", report.ReviewedFileName ?? "Reviewed_File");
     }
 
     // ==========================================

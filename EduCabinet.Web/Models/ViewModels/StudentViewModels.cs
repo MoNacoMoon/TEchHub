@@ -196,6 +196,9 @@ public class StudentReportSubmissionDto
     public string? TeacherFeedback { get; set; }
     public DateTime? ReviewedAt { get; set; }
     public string? ReviewedByTeacherName { get; set; }
+    public string? ReviewedFilePath { get; set; }
+    public string? ReviewedFileName { get; set; }
+    public long? ReviewedFileSizeBytes { get; set; }
 }
 
 public class ControlQuestionStudyDto
@@ -306,4 +309,68 @@ public class TestAnswerDetailDto
     public string GivenAnswer { get; set; } = string.Empty;
     public bool IsCorrect { get; set; }
     public int PointsEarned { get; set; }
+}
+
+public class StudentReportsListViewModel
+{
+    public ReportSubmissionStatus? SelectedStatus { get; set; }
+    public int TotalCount { get; set; }
+    public int PendingCount { get; set; }
+    public int NeedsRevisionCount { get; set; }
+    public int ApprovedCount { get; set; }
+    public List<StudentReportItemDto> Reports { get; set; } = new();
+}
+
+public class StudentReportItemDto
+{
+    public int Id { get; set; }
+    public int LectureId { get; set; }
+    public string LectureTitle { get; set; } = string.Empty;
+    public int DisciplineId { get; set; }
+    public string DisciplineTitle { get; set; } = string.Empty;
+    public string OriginalFileName { get; set; } = string.Empty;
+    public long FileSizeBytes { get; set; }
+    public string? StudentComment { get; set; }
+    public DateTime SubmittedAt { get; set; }
+    public ReportSubmissionStatus Status { get; set; }
+    public int? Grade { get; set; }
+    public int? MaxScore { get; set; }
+    public string? TeacherFeedback { get; set; }
+    public DateTime? ReviewedAt { get; set; }
+    public string? ReviewedByTeacherName { get; set; }
+    public string? ReviewedFilePath { get; set; }
+    public string? ReviewedFileName { get; set; }
+    public long? ReviewedFileSizeBytes { get; set; }
+}
+
+public class StudentGradebookViewModel
+{
+    public string StudentFullName { get; set; } = string.Empty;
+    public string GroupName { get; set; } = string.Empty;
+    public int CompletedDisciplinesCount { get; set; }
+    public int TotalDisciplinesCount { get; set; }
+    public double OverallAverageScore { get; set; }
+    public int TotalTestsPassed { get; set; }
+    public int TotalReportsApproved { get; set; }
+    public List<DisciplineGradebookItemDto> Disciplines { get; set; } = new();
+}
+
+public class DisciplineGradebookItemDto
+{
+    public int DisciplineId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    public string TeacherName { get; set; } = string.Empty;
+    public int ProgressPercent { get; set; }
+    public int CompletedLectures { get; set; }
+    public int TotalLectures { get; set; }
+    public double? AverageTestScore { get; set; }
+    public int TestsPassedCount { get; set; }
+    public int TotalTestsCount { get; set; }
+    public int ReportsApprovedCount { get; set; }
+    public int TotalReportsCount { get; set; }
+    public int TotalReportScoreEarned { get; set; }
+    public int TotalReportScorePossible { get; set; }
+    public bool IsCompleted => ProgressPercent >= 100;
+    public bool CanGetCertificate => ProgressPercent >= 100;
 }

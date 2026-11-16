@@ -65,7 +65,9 @@
                         }
                         else if (User.IsInRole("Student"))
                         {
-                            <a class="top-nav-link active" asp-controller="Student" asp-action="Index">Мои дисциплины</a>
+                            <a class="top-nav-link" asp-controller="Student" asp-action="Index">Дисциплины</a>
+                            <a class="top-nav-link" asp-controller="Student" asp-action="MyReports">Мои отчёты</a>
+                            <a class="top-nav-link" asp-controller="Student" asp-action="Gradebook">Зачётка</a>
                         }
                     }
                 </nav>
@@ -295,9 +297,17 @@
                         }
                         else if (User.IsInRole("Student"))
                         {
-                            <a class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-2 px-3 active" asp-controller="Student" asp-action="Index">
-                                <i class="bi bi-mortarboard-fill fs-5"></i>
+                            <a class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-2 px-3" asp-controller="Student" asp-action="Index">
+                                <i class="bi bi-mortarboard-fill text-primary fs-5"></i>
                                 <span>Мои дисциплины</span>
+                            </a>
+                            <a class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-2 px-3" asp-controller="Student" asp-action="MyReports">
+                                <i class="bi bi-folder-check text-warning fs-5"></i>
+                                <span>Мои отчёты и задания</span>
+                            </a>
+                            <a class="list-group-item list-group-item-action d-flex align-items-center gap-3 py-2 px-3" asp-controller="Student" asp-action="Gradebook">
+                                <i class="bi bi-journal-check text-success fs-5"></i>
+                                <span>Электронная зачётка</span>
                             </a>
                         }
                     </div>

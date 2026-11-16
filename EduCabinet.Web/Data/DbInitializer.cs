@@ -56,6 +56,9 @@ public static class DbInitializer
                     ""TeacherFeedback"" TEXT NULL,
                     ""ReviewedAt"" TEXT NULL,
                     ""ReviewedByTeacherId"" INTEGER NULL,
+                    ""ReviewedFilePath"" TEXT NULL,
+                    ""ReviewedFileName"" TEXT NULL,
+                    ""ReviewedFileSizeBytes"" INTEGER NULL,
                     CONSTRAINT ""FK_StudentReportSubmissions_Lectures_LectureId"" FOREIGN KEY (""LectureId"") REFERENCES ""Lectures"" (""Id"") ON DELETE CASCADE,
                     CONSTRAINT ""FK_StudentReportSubmissions_Users_StudentId"" FOREIGN KEY (""StudentId"") REFERENCES ""Users"" (""Id"") ON DELETE CASCADE,
                     CONSTRAINT ""FK_StudentReportSubmissions_Users_ReviewedByTeacherId"" FOREIGN KEY (""ReviewedByTeacherId"") REFERENCES ""Users"" (""Id"") ON DELETE SET NULL
@@ -63,6 +66,11 @@ public static class DbInitializer
             ");
         }
         catch { }
+
+        // Гарантируем наличие колонок проверенного файла в StudentReportSubmissions
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""StudentReportSubmissions"" ADD COLUMN ""ReviewedFilePath"" TEXT NULL;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""StudentReportSubmissions"" ADD COLUMN ""ReviewedFileName"" TEXT NULL;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""StudentReportSubmissions"" ADD COLUMN ""ReviewedFileSizeBytes"" INTEGER NULL;"); } catch { }
 
         // Гарантируем наличие таблицы SystemInviteTokens
         try

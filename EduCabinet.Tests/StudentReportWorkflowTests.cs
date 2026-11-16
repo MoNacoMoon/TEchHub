@@ -283,4 +283,126 @@ public class StudentReportWorkflowTests
             Assert.Null(updated.TeacherFeedback);
         }
     }
+
+    [Fact]
+    public async Task TeacherCanAttachReviewedFile_StudentReceivesIt()
+    {
+        var (context, connection) = TestHelper.CreateInMemoryDbContext();
+        using (connection)
+        using (context)
+        {
+            var teacher = new User { Username = "prof_brown", FullName = "Профессор Браун", Role = UserRole.Teacher };
+            var student = new User { Username = "student_doc", FullName = "Марти Макфлай", Role = UserRole.Student };
+            var discipline = new Discipline { Title = "Физика времени", Description = "Практический курс" };
+            var topic = new Topic { Discipline = discipline, Title = "Лабораторные", OrderIndex = 1 };
+            var lecture = new Lecture
+            {
+                Topic = topic,
+                Title = "Лабораторная по потоковому накопителю",
+                OrderIndex = 1,
+                ContentHtml = "Методичка",
+                RequiresReportSubmission = true,
+                MaxReportScore = 100
+            };
+
+            context.Users.AddRange(teacher, student);
+            context.Disciplines.Add(discipline);
+            context.Topics.Add(topic);
+            context.Lectures.Add(lecture);
+            await context.SaveChangesAsync();
+
+            // 1. Студент сдал работу
+            var submission = new StudentReportSubmission
+            {
+                LectureId = lecture.Id,
+                StudentId = student.Id,
+                FilePath = "/uploads/reports/flux_report.docx",
+                OriginalFileName = "Flux_Report.docx",
+                FileSizeBytes = 15000,
+                Status = ReportSubmissionStatus.Pending,
+                SubmittedAt = DateTime.UtcNow
+            };
+            context.StudentReportSubmissions.Add(submission);
+            await context.SaveChangesAsync();
+
+            // 2. Преподаватель проверил, оставил замечания и прикрепил файл с правками
+            submission.Status = ReportSubmissionStatus.NeedsRevision;
+            submission.Grade = 60;
+            submission.TeacherFeedback = "Исправьте расчет мощности в 1.21 ГВт. См. файл с правками.";
+            submission.ReviewedAt = DateTime.UtcNow;
+            submission.ReviewedByTeacherId = teacher.Id;
+            submission.ReviewedFilePath = "/uploads/reports/t_rev_flux_corrections.docx";
+            submission.ReviewedFileName = "Flux_Report_с_правками.docx";
+            submission.ReviewedFileSizeBytes = 18500;
+
+            await context.SaveChangesAsync();
+
+            // Assert
+            var saved = await context.StudentReportSubmissions
+                .Include(s => s.ReviewedByTeacher)
+                .FirstOrDefaultAsync(s => s.Id == submission.Id);
+
+            Assert.NotNull(saved);
+            Assert.Equal(ReportSubmissionStatus.NeedsRevision, saved.Status);
+            Assert.Equal(60, saved.Grade);
+            Assert.Equal("/uploads/reports/t_rev_flux_corrections.docx", saved.ReviewedFilePath);
+            Assert.Equal("Flux_Report_с_правками.docx", saved.ReviewedFileName);
+            Assert.Equal(18500, saved.ReviewedFileSizeBytes);
+            Assert.Equal("Профессор Браун", saved.ReviewedByTeacher?.FullName);
+        }
+    }
+
+    [Fact]
+    public async Task StudentGradebook_AggregatesResultsCorrectly()
+    {
+        var (context, connection) = TestHelper.CreateInMemoryDbContext();
+        using (connection)
+        using (context)
+        {
+            var eventLogger = new EventLogService(context);
+            var service = new LectureAccessService(context, eventLogger);
+
+            var student = new User { Username = "student_gb", FullName = "Иванов Иван", Role = UserRole.Student };
+            var group = new StudentGroup { Name = "ИТ-21" };
+            var discipline = new Discipline { Title = "Программирование", Description = "Базовый курс" };
+            var topic = new Topic { Discipline = discipline, Title = "Тема 1", OrderIndex = 1 };
+            var lec1 = new Lecture { Topic = topic, Title = "Лекция 1", OrderIndex = 1, ContentHtml = "Теория 1", RequiresReportSubmission = true, MaxReportScore = 100 };
+            var lec2 = new Lecture { Topic = topic, Title = "Лекция 2", OrderIndex = 2, ContentHtml = "Теория 2" };
+
+            context.Users.Add(student);
+            context.StudentGroups.Add(group);
+            context.GroupMemberships.Add(new GroupMembership { Student = student, Group = group });
+            context.Disciplines.Add(discipline);
+            context.DisciplineGroups.Add(new DisciplineGroup { Discipline = discipline, Group = group });
+            context.Topics.Add(topic);
+            context.Lectures.AddRange(lec1, lec2);
+            await context.SaveChangesAsync();
+
+            // Студент сдал отчет по лекции 1 и преподаватель его зачел
+            var report = new StudentReportSubmission
+            {
+                LectureId = lec1.Id,
+                StudentId = student.Id,
+                FilePath = "/uploads/reports/code.zip",
+                OriginalFileName = "code.zip",
+                Status = ReportSubmissionStatus.Approved,
+                Grade = 95,
+                ReviewedAt = DateTime.UtcNow
+            };
+            context.StudentReportSubmissions.Add(report);
+            await context.SaveChangesAsync();
+
+            await service.UpdateLectureCompletionStatusAsync(student.Id, lec1.Id);
+
+            var prog = await service.GetDisciplineProgressAsync(student.Id, discipline.Id);
+
+            Assert.Equal(2, prog.TotalLectures);
+            Assert.Equal(1, prog.CompletedLectures);
+            Assert.Equal(50, prog.ProgressPercent);
+
+            var lec1Info = prog.Lectures.First(l => l.LectureId == lec1.Id);
+            Assert.True(lec1Info.IsReportApproved);
+            Assert.Equal(95, lec1Info.ReportGrade);
+        }
+    }
 }

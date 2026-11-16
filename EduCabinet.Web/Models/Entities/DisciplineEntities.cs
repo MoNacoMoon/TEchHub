@@ -126,6 +126,10 @@ public class StudentReportSubmission
     public string? TeacherFeedback { get; set; }
     public DateTime? ReviewedAt { get; set; }
 
+    public string? ReviewedFilePath { get; set; } // Путь к проверенному файлу с правками преподавателя
+    public string? ReviewedFileName { get; set; } // Имя проверенного файла с замечаниями
+    public long? ReviewedFileSizeBytes { get; set; }
+
     public int? ReviewedByTeacherId { get; set; }
     public User? ReviewedByTeacher { get; set; }
 }
