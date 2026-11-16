@@ -75,27 +75,39 @@ builder.Services.AddRateLimiter(options =>
         {
             return RateLimitPartition.GetFixedWindowLimiter($"user_{userId}", _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 180,
+                PermitLimit = 120,
                 Window = TimeSpan.FromMinutes(1),
                 QueueLimit = 0
             });
         }
 
-        var clientIp = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var forwarded = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        var clientIp = !string.IsNullOrWhiteSpace(forwarded)
+            ? forwarded.Split(',')[0].Trim()
+            : (httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+
         return RateLimitPartition.GetFixedWindowLimiter($"ip_{clientIp}", _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 1200,
+            PermitLimit = 600,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0
         });
     });
 
-    // Ограничитель попыток входа (60 в минуту на IP — защищает от ботнетов, но позволяет целой аудитории войти на пару)
-    options.AddFixedWindowLimiter("auth", opt =>
+    // Ограничитель авторизации и проверки инвайтов: строго 60 в минуту на IP (защита от перебора)
+    options.AddPolicy("auth", httpContext =>
     {
-        opt.PermitLimit = 60;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueLimit = 0;
+        var forwarded = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        var clientIp = !string.IsNullOrWhiteSpace(forwarded)
+            ? forwarded.Split(',')[0].Trim()
+            : (httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+
+        return RateLimitPartition.GetFixedWindowLimiter($"auth_{clientIp}", _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 60,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0
+        });
     });
 
     // Ограничитель регистрации: строго максимум 3 попытки на 1 IP за 15 минут (защита от перебора инвайтов и спама)
@@ -274,11 +286,11 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
-// Применение ограничения частоты запросов
-app.UseRateLimiter();
-
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Применение ограничения частоты запросов ПОСЛЕ аутентификации (чтобы HttpContext.User был заполнен)
+app.UseRateLimiter();
 
 // Маршрутизация для Web API контроллеров
 app.MapControllers();

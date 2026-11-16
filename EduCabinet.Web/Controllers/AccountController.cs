@@ -48,6 +48,7 @@ public class AccountController : Controller
 
     [HttpGet]
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     public IActionResult Login(string? returnUrl = null)
     {
         if (User.Identity?.IsAuthenticated == true)
