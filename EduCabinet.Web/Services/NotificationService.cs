@@ -70,6 +70,54 @@ public class NotificationService : INotificationService
         await _db.SaveChangesAsync();
     }
 
+    public async Task NotifyDisciplineStudentsAsync(int disciplineId, string title, string message, NotificationType type = NotificationType.Info, string? url = null)
+    {
+        var discipline = await _db.Disciplines
+            .Include(d => d.DisciplineGroups)
+            .FirstOrDefaultAsync(d => d.Id == disciplineId);
+
+        if (discipline == null) return;
+
+        var groupIds = discipline.DisciplineGroups.Select(dg => dg.GroupId).ToList();
+        List<int> studentIds;
+
+        if (groupIds.Any())
+        {
+            studentIds = await _db.GroupMemberships
+                .Where(gm => groupIds.Contains(gm.GroupId) && gm.Student.IsActive && gm.Student.Role == UserRole.Student)
+                .Select(gm => gm.StudentId)
+                .Distinct()
+                .ToListAsync();
+        }
+        else
+        {
+            // Если группы пока не привязаны к дисциплине, уведомляем всех активных студентов
+            studentIds = await _db.Users
+                .Where(u => u.IsActive && u.Role == UserRole.Student)
+                .Select(u => u.Id)
+                .ToListAsync();
+        }
+
+        if (!studentIds.Any()) return;
+
+        var now = DateTime.UtcNow;
+        foreach (var sId in studentIds)
+        {
+            _db.UserNotifications.Add(new UserNotification
+            {
+                UserId = sId,
+                Title = title,
+                Message = message,
+                Type = type,
+                Url = url,
+                IsRead = false,
+                CreatedAt = now
+            });
+        }
+
+        await _db.SaveChangesAsync();
+    }
+
     public async Task<List<UserNotificationDto>> GetRecentNotificationsAsync(int userId, int take = 10)
     {
         var list = await _db.UserNotifications

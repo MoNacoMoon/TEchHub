@@ -132,4 +132,54 @@ public class NotificationServiceTests
             Assert.Equal("📥 Сдан новый отчет", notifications[0].Title);
         }
     }
+
+    [Fact]
+    public async Task NotifyDisciplineStudents_ShouldNotifyAllStudentsInGroup()
+    {
+        var (context, conn) = TestHelper.CreateInMemoryDbContext();
+        using (conn)
+        {
+            var student = new User
+            {
+                Username = "student_group",
+                PasswordHash = "hash",
+                FullName = "Александр Петров",
+                Role = UserRole.Student,
+                IsActive = true
+            };
+            context.Users.Add(student);
+            await context.SaveChangesAsync();
+
+            var group = new StudentGroup { Name = "ИТ-101", InviteCode = "IT101" };
+            context.StudentGroups.Add(group);
+            await context.SaveChangesAsync();
+
+            context.GroupMemberships.Add(new GroupMembership { GroupId = group.Id, StudentId = student.Id });
+
+            var discipline = new Discipline { Title = "Базы данных", IsActive = true };
+            context.Disciplines.Add(discipline);
+            await context.SaveChangesAsync();
+
+            context.DisciplineGroups.Add(new DisciplineGroup { DisciplineId = discipline.Id, GroupId = group.Id });
+            await context.SaveChangesAsync();
+
+            var service = new NotificationService(context);
+
+            await service.NotifyDisciplineStudentsAsync(
+                discipline.Id,
+                "📢 Новое учебное задание",
+                "Опубликована новая лекция 'Реляционная модель'",
+                NotificationType.Info,
+                "/Student/Lecture/10"
+            );
+
+            var unread = await service.GetUnreadCountAsync(student.Id);
+            Assert.Equal(1, unread);
+
+            var notifs = await service.GetRecentNotificationsAsync(student.Id);
+            Assert.Single(notifs);
+            Assert.Equal("📢 Новое учебное задание", notifs[0].Title);
+            Assert.Equal("/Student/Lecture/10", notifs[0].Url);
+        }
+    }
 }

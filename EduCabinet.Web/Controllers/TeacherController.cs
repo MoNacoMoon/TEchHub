@@ -433,6 +433,19 @@ public class TeacherController : Controller
             HttpContext.Connection.RemoteIpAddress?.ToString()
         );
 
+        // Уведомление студентам о публикации объявления
+        try
+        {
+            await _notificationService.NotifyDisciplineStudentsAsync(
+                disciplineId,
+                $"📢 Объявление: {announcement.Title}",
+                announcement.Content.Length > 120 ? announcement.Content.Substring(0, 117) + "..." : announcement.Content,
+                NotificationType.Info,
+                $"/Student/Discipline/{disciplineId}"
+            );
+        }
+        catch { }
+
         TempData["SuccessMessage"] = "Объявление успешно опубликовано для студентов";
         return RedirectToAction(nameof(DisciplineDetails), new { id = disciplineId });
     }
@@ -562,6 +575,26 @@ public class TeacherController : Controller
             lecture.Title,
             HttpContext.Connection.RemoteIpAddress?.ToString()
         );
+
+        // Интерактивное уведомление студентам курса о новом задании / лекции
+        try
+        {
+            var topic = await _db.Topics.Include(t => t.Discipline).FirstOrDefaultAsync(t => t.Id == lecture.TopicId);
+            string discTitle = topic?.Discipline.Title ?? "учебному курсу";
+            string deadlineNotice = lecture.ReportDeadline.HasValue 
+                ? $" Дедлайн сдачи: {lecture.ReportDeadline.Value.ToLocalTime():dd.MM.yyyy HH:mm}." 
+                : "";
+            string reqReportNotice = lecture.RequiresReportSubmission ? " Требуется сдача практической работы." : "";
+
+            await _notificationService.NotifyDisciplineStudentsAsync(
+                model.DisciplineId,
+                "📢 Новое учебное задание",
+                $"По дисциплине «{discTitle}» добавлена новая лекция «{lecture.Title}».{reqReportNotice}{deadlineNotice}",
+                NotificationType.Info,
+                $"/Student/Lecture/{lecture.Id}"
+            );
+        }
+        catch { }
 
         TempData["SuccessMessage"] = "Лекция успешно создана! Теперь вы можете добавить контрольные вопросы и настроить тест.";
         return RedirectToAction(nameof(LectureDetails), new { id = lecture.Id });

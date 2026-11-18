@@ -1301,6 +1301,44 @@ public class StudentController : Controller
             HttpContext.Connection.RemoteIpAddress?.ToString()
         );
 
+        // Уведомление студенту об открытии следующего задания
+        if (isLectureCompleted)
+        {
+            try
+            {
+                var allDisciplineLectures = await _db.Lectures
+                    .Include(l => l.Topic)
+                    .Where(l => l.Topic.DisciplineId == test.Lecture.Topic.DisciplineId)
+                    .OrderBy(l => l.Topic.OrderIndex)
+                    .ThenBy(l => l.OrderIndex)
+                    .ToListAsync();
+
+                int currentIndex = allDisciplineLectures.FindIndex(l => l.Id == test.LectureId);
+                if (currentIndex >= 0 && currentIndex < allDisciplineLectures.Count - 1)
+                {
+                    var nextLec = allDisciplineLectures[currentIndex + 1];
+                    await _notificationService.CreateNotificationAsync(
+                        studentId,
+                        "🎯 Открыто следующее задание!",
+                        $"Вы успешно освоили лекцию «{test.Lecture.Title}». Вам открыт доступ к следующей лекции «{nextLec.Title}»!",
+                        NotificationType.Success,
+                        $"/Student/Lecture/{nextLec.Id}"
+                    );
+                }
+                else
+                {
+                    await _notificationService.CreateNotificationAsync(
+                        studentId,
+                        "🏆 Курс успешно освоен!",
+                        $"Поздравляем! Вы завершили изучение всех лекций дисциплины «{test.Lecture.Topic.Discipline?.Title ?? "курса"}».",
+                        NotificationType.Success,
+                        $"/Student/Discipline/{test.Lecture.Topic.DisciplineId}"
+                    );
+                }
+            }
+            catch { }
+        }
+
         return RedirectToAction(nameof(TestResult), new { attemptId = attempt.Id });
     }
 
