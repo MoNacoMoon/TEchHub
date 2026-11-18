@@ -187,6 +187,7 @@ public class LectureAccessService : ILectureAccessService
         var lecture = await _db.Lectures
             .Include(l => l.ControlQuestions)
             .Include(l => l.Test)
+                .ThenInclude(t => t!.Questions)
             .FirstOrDefaultAsync(l => l.Id == lectureId);
 
         if (lecture == null) return false;
@@ -251,14 +252,20 @@ public class LectureAccessService : ILectureAccessService
         }
         progress.IsControlQuestionsPassed = questionsPassed;
 
-        // 2. Проверяем тест к лекции
+        // 2. Проверяем тест к лекции (только если тест существует, активен и в нем есть вопросы или попытки)
         bool testPassed = true;
         if (lecture.Test != null && lecture.Test.IsActive)
         {
-            var successfulAttempt = await _db.TestAttempts
-                .AnyAsync(a => a.StudentId == studentId && a.TestId == lecture.Test.Id && a.IsPassed);
+            bool hasQuestions = lecture.Test.Questions.Any();
+            bool hasAttempts = await _db.TestAttempts.AnyAsync(a => a.TestId == lecture.Test.Id);
 
-            testPassed = successfulAttempt;
+            if (hasQuestions || hasAttempts)
+            {
+                var successfulAttempt = await _db.TestAttempts
+                    .AnyAsync(a => a.StudentId == studentId && a.TestId == lecture.Test.Id && a.IsPassed);
+
+                testPassed = successfulAttempt;
+            }
         }
         progress.IsTestPassed = testPassed;
 

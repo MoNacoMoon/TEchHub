@@ -2,7 +2,19 @@
 @{
     ViewData["Title"] = Model.Title;
     int words = (Model.ContentHtml ?? "").Split(new[] { ' ', '\t', '\n', '<', '>' }, StringSplitOptions.RemoveEmptyEntries).Length;
+    if (Model.HasDocumentContent) words += 800;
     int readingMinutes = Math.Max(2, (int)Math.Ceiling(words / 120.0));
+
+    bool hasQuestions = Model.ControlQuestions.Any();
+    bool hasTest = Model.TestSummary != null && Model.TestSummary.TotalQuestions > 0;
+    bool hasReport = Model.RequiresReportSubmission;
+    int activeRequirementsCount = (hasQuestions ? 1 : 0) + (hasTest ? 1 : 0) + (hasReport ? 1 : 0);
+    string colClass = activeRequirementsCount switch
+    {
+        1 => "col-12",
+        2 => "col-md-6",
+        _ => "col-md-4"
+    };
 }
 
 <div id="readingProgressBar" class="reading-progress-bar"></div>
@@ -43,63 +55,79 @@
         </div>
 
         <!-- Статус выполнения обязательных условий -->
-        <div class="row g-2 mt-3 pt-3 border-top">
-            <div class="col-md-@(Model.RequiresReportSubmission ? "4" : "6")">
-                <div class="d-flex align-items-center gap-2 small">
-                    @if (Model.IsControlQuestionsPassed)
-                    {
-                        <i class="bi bi-check-circle-fill text-success fs-5"></i>
-                        <span><strong>Контрольные вопросы:</strong> выполнены</span>
-                    }
-                    else
-                    {
-                        <i class="bi bi-dash-circle text-warning fs-5"></i>
-                        <span><strong>Контрольные вопросы:</strong> требуется ответить</span>
-                    }
-                </div>
-            </div>
-            <div class="col-md-@(Model.RequiresReportSubmission ? "4" : "6")">
-                <div class="d-flex align-items-center gap-2 small">
-                    @if (Model.IsTestPassed)
-                    {
-                        <i class="bi bi-check-circle-fill text-success fs-5"></i>
-                        <span><strong>Итоговый тест:</strong> сдан</span>
-                    }
-                    else
-                    {
-                        <i class="bi bi-dash-circle text-warning fs-5"></i>
-                        <span><strong>Итоговый тест:</strong> требуется сдать тест</span>
-                    }
-                </div>
-            </div>
-            @if (Model.RequiresReportSubmission)
-            {
-                <div class="col-md-4">
-                    <div class="d-flex align-items-center gap-2 small">
-                        @if (Model.IsReportApproved)
-                        {
-                            <i class="bi bi-check-circle-fill text-success fs-5"></i>
-                            <span><strong>Отчёт:</strong> зачтено @(Model.ReportGrade.HasValue ? $"({Model.ReportGrade}/{Model.MaxReportScore ?? 100} б.)" : "")</span>
-                        }
-                        else if (Model.CurrentReportSubmission != null && Model.CurrentReportSubmission.Status == ReportSubmissionStatus.Pending)
-                        {
-                            <i class="bi bi-hourglass-split text-warning fs-5"></i>
-                            <span><strong>Отчёт:</strong> на проверке</span>
-                        }
-                        else if (Model.CurrentReportSubmission != null && Model.CurrentReportSubmission.Status == ReportSubmissionStatus.NeedsRevision)
-                        {
-                            <i class="bi bi-exclamation-triangle-fill text-danger fs-5"></i>
-                            <span><strong>Отчёт:</strong> на доработке</span>
-                        }
-                        else
-                        {
-                            <i class="bi bi-dash-circle text-warning fs-5"></i>
-                            <span><strong>Отчёт:</strong> требуется сдать файл</span>
-                        }
+        @if (activeRequirementsCount > 0)
+        {
+            <div class="row g-2 mt-3 pt-3 border-top">
+                @if (hasQuestions)
+                {
+                    <div class="@colClass">
+                        <div class="d-flex align-items-center gap-2 small">
+                            @if (Model.IsControlQuestionsPassed)
+                            {
+                                <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                                <span><strong>Контрольные вопросы:</strong> выполнены</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-dash-circle text-warning fs-5"></i>
+                                <span><strong>Контрольные вопросы:</strong> требуется ответить</span>
+                            }
+                        </div>
                     </div>
-                </div>
-            }
-        </div>
+                }
+                @if (hasTest)
+                {
+                    <div class="@colClass">
+                        <div class="d-flex align-items-center gap-2 small">
+                            @if (Model.IsTestPassed)
+                            {
+                                <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                                <span><strong>Итоговый тест:</strong> сдан</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-dash-circle text-warning fs-5"></i>
+                                <span><strong>Итоговый тест:</strong> требуется сдать тест</span>
+                            }
+                        </div>
+                    </div>
+                }
+                @if (hasReport)
+                {
+                    <div class="@colClass">
+                        <div class="d-flex align-items-center gap-2 small">
+                            @if (Model.IsReportApproved)
+                            {
+                                <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                                <span><strong>Отчёт:</strong> зачтено @(Model.ReportGrade.HasValue ? $"({Model.ReportGrade}/{Model.MaxReportScore ?? 100} б.)" : "")</span>
+                            }
+                            else if (Model.CurrentReportSubmission != null && Model.CurrentReportSubmission.Status == ReportSubmissionStatus.Pending)
+                            {
+                                <i class="bi bi-hourglass-split text-warning fs-5"></i>
+                                <span><strong>Отчёт:</strong> на проверке</span>
+                            }
+                            else if (Model.CurrentReportSubmission != null && Model.CurrentReportSubmission.Status == ReportSubmissionStatus.NeedsRevision)
+                            {
+                                <i class="bi bi-exclamation-triangle-fill text-danger fs-5"></i>
+                                <span><strong>Отчёт:</strong> на доработке</span>
+                            }
+                            else
+                            {
+                                <i class="bi bi-dash-circle text-warning fs-5"></i>
+                                <span><strong>Отчёт:</strong> требуется сдать файл</span>
+                            }
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+        else
+        {
+            <div class="mt-3 pt-3 border-top small text-muted d-flex align-items-center gap-2">
+                <i class="bi bi-info-circle text-primary fs-5"></i>
+                <span>Для этой темы не предусмотрены контрольные вопросы или тесты. Достаточно изучить теоретический материал.</span>
+            </div>
+        }
     </div>
 </div>
 
@@ -110,20 +138,23 @@
             <i class="bi bi-book me-1"></i> Теоретический материал
         </button>
     </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link fw-semibold position-relative" id="questions-tab" data-bs-toggle="pill" data-bs-target="#questions-pane" type="button" role="tab" aria-controls="questions-pane" aria-selected="false">
-            <i class="bi bi-patch-question me-1"></i> Контрольные вопросы
-            @if (Model.IsControlQuestionsPassed)
-            {
-                <span class="badge bg-success ms-1"><i class="bi bi-check"></i></span>
-            }
-            else
-            {
-                <span class="badge bg-secondary ms-1">@Model.ControlQuestions.Count</span>
-            }
-        </button>
-    </li>
-    @if (Model.TestSummary != null)
+    @if (hasQuestions)
+    {
+        <li class="nav-item" role="presentation">
+            <button class="nav-link fw-semibold position-relative" id="questions-tab" data-bs-toggle="pill" data-bs-target="#questions-pane" type="button" role="tab" aria-controls="questions-pane" aria-selected="false">
+                <i class="bi bi-patch-question me-1"></i> Контрольные вопросы
+                @if (Model.IsControlQuestionsPassed)
+                {
+                    <span class="badge bg-success ms-1"><i class="bi bi-check"></i></span>
+                }
+                else
+                {
+                    <span class="badge bg-secondary ms-1">@Model.ControlQuestions.Count</span>
+                }
+            </button>
+        </li>
+    }
+    @if (hasTest)
     {
         <li class="nav-item" role="presentation">
             <button class="nav-link fw-semibold" id="test-tab" data-bs-toggle="pill" data-bs-target="#test-pane" type="button" role="tab" aria-controls="test-pane" aria-selected="false">
@@ -134,12 +165,12 @@
                 }
                 else
                 {
-                    <span class="badge bg-warning text-dark ms-1">@Model.TestSummary.PassingScorePercent%</span>
+                    <span class="badge bg-warning text-dark ms-1">@Model.TestSummary!.PassingScorePercent%</span>
                 }
             </button>
         </li>
     }
-    @if (Model.RequiresReportSubmission)
+    @if (hasReport)
     {
         <li class="nav-item" role="presentation">
             <button class="nav-link fw-semibold position-relative" id="report-tab" data-bs-toggle="pill" data-bs-target="#report-pane" type="button" role="tab" aria-controls="report-pane" aria-selected="false">
@@ -173,36 +204,51 @@
             </button>
         </div>
 
-        @if (!string.IsNullOrEmpty(Model.AttachmentFilePath))
+        @if (Model.HasDocumentContent)
         {
-            <div class="card bg-light border mb-4 zen-hide">
-                <div class="card-body p-3">
-                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-file-earmark-pdf-fill text-danger fs-3"></i>
-                            <div>
-                                <div class="fw-semibold">@Model.AttachmentOriginalName</div>
-                                <div class="text-muted small">Официальный теоретический конспект к лекции</div>
-                            </div>
+            <div class="card shadow-sm border-0 mb-4 zen-reader-container">
+                <div class="card-body p-4 p-lg-5">
+                    @if (!string.IsNullOrWhiteSpace(Model.ContentHtml) && Model.ContentHtml != "<p></p>" && Model.ContentHtml.Trim().Length > 10)
+                    {
+                        <div class="mb-4 pb-4 border-bottom fs-6 lh-base text-break">
+                            @Html.Raw(Model.ContentHtml)
                         </div>
-                        <div class="d-flex gap-2">
-                            <a asp-action="DownloadAttachment" asp-route-id="@Model.Id" target="_blank" class="btn btn-outline-primary btn-sm">
-                                <i class="bi bi-box-arrow-up-right me-1"></i> Открыть в новой вкладке
-                            </a>
-                            <a asp-action="DownloadAttachment" asp-route-id="@Model.Id" download class="btn btn-primary btn-sm">
-                                <i class="bi bi-download me-1"></i> Скачать файл
-                            </a>
-                        </div>
-                    </div>
+                    }
+                    @Html.Raw(Model.ExtractedDocumentHtml)
                 </div>
             </div>
         }
+        else if (!string.IsNullOrEmpty(Model.AttachmentFilePath) && (Model.AttachmentOriginalName?.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) == true || Model.AttachmentFilePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (!string.IsNullOrWhiteSpace(Model.ContentHtml) && Model.ContentHtml != "<p></p>" && Model.ContentHtml.Trim().Length > 10)
+            {
+                <div class="card shadow-sm border-0 mb-4 zen-reader-container">
+                    <div class="card-body p-4 p-lg-5 fs-6 lh-base text-break">
+                        @Html.Raw(Model.ContentHtml)
+                    </div>
+                </div>
+            }
 
-        <div class="card shadow-sm border-0 mb-4 zen-reader-container">
-            <div class="card-body p-4 p-lg-5 fs-6 lh-base text-break">
-                @Html.Raw(Model.ContentHtml)
+            <div class="card shadow-sm border-0 mb-4 zen-hide" style="border-radius: 12px; overflow: hidden;">
+                <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center">
+                    <span class="small fw-bold text-body"><i class="bi bi-file-earmark-pdf-fill text-danger me-2"></i>Документ лекции (PDF): @Model.AttachmentOriginalName</span>
+                    <a asp-action="DownloadAttachment" asp-route-id="@Model.Id" target="_blank" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrows-fullscreen me-1"></i>На весь экран
+                    </a>
+                </div>
+                <div class="card-body p-0" style="height: 700px;">
+                    <iframe src="@Url.Action("DownloadAttachment", new { id = Model.Id })#toolbar=1" width="100%" height="100%" style="border: none;"></iframe>
+                </div>
             </div>
-        </div>
+        }
+        else
+        {
+            <div class="card shadow-sm border-0 mb-4 zen-reader-container">
+                <div class="card-body p-4 p-lg-5 fs-6 lh-base text-break">
+                    @Html.Raw(Model.ContentHtml)
+                </div>
+            </div>
+        }
 
         <!-- Личные заметки студента к лекции -->
         <div class="card shadow-sm border-0 mb-4 zen-hide" style="border-left: 4px solid #f59e0b !important;">
@@ -215,35 +261,109 @@
             </div>
         </div>
 
-        <div class="d-flex justify-content-between align-items-center mt-3">
+        @if (!string.IsNullOrEmpty(Model.AttachmentFilePath))
+        {
+            <!-- Оригинальный файл лекции для скачивания (в конце теоретического материала) -->
+            <div class="card border mb-4 mt-4 zen-hide" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.04), rgba(16, 185, 129, 0.04)); border-radius: 12px;">
+                <div class="card-body p-3 p-md-4">
+                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="p-3 bg-white rounded-3 shadow-sm border">
+                                @{
+                                    var attExt = System.IO.Path.GetExtension(Model.AttachmentOriginalName ?? "").ToLowerInvariant();
+                                    string attIcon = attExt switch
+                                    {
+                                        ".pptx" or ".ppt" => "bi-file-earmark-slides text-primary",
+                                        ".docx" or ".doc" => "bi-file-earmark-word text-primary",
+                                        ".pdf" => "bi-file-earmark-pdf-fill text-danger",
+                                        _ => "bi-file-earmark-arrow-down text-success"
+                                    };
+                                }
+                                <i class="bi @attIcon fs-2"></i>
+                            </div>
+                            <div>
+                                <div class="fw-bold text-body">Оригинальный файл лекции: @Model.AttachmentOriginalName</div>
+                                <div class="text-muted small">Вы можете скачать файл для автономного изучения, печати или просмотра в офисных программах.</div>
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <a asp-action="DownloadAttachment" asp-route-id="@Model.Id" target="_blank" class="btn btn-outline-primary btn-sm px-3">
+                                <i class="bi bi-box-arrow-up-right me-1"></i> Открыть
+                            </a>
+                            <a asp-action="DownloadAttachment" asp-route-id="@Model.Id" download class="btn btn-primary btn-sm px-3 shadow-sm">
+                                <i class="bi bi-download me-1"></i> Скачать файл
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center mt-4 pt-3 border-top gap-3">
             <a asp-action="Discipline" asp-route-id="@Model.DisciplineId" class="btn btn-outline-secondary">
                 <i class="bi bi-arrow-left me-1"></i> К списку тем
             </a>
-            <button type="button" class="btn btn-primary" onclick="document.getElementById('questions-tab').click()">
-                Перейти к контрольным вопросам <i class="bi bi-arrow-right ms-1"></i>
-            </button>
+
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                @if (hasQuestions)
+                {
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('questions-tab').click()">
+                        Перейти к контрольным вопросам <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                }
+                else if (hasTest)
+                {
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('test-tab').click()">
+                        Перейти к итоговому тесту <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                }
+                else if (hasReport)
+                {
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('report-tab').click()">
+                        Сдать отчёт по практике <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                }
+                else
+                {
+                    @if (Model.IsCompleted)
+                    {
+                        <span class="badge bg-success-subtle text-success border px-3 py-2 fs-6">
+                            <i class="bi bi-check-circle-fill me-1"></i>Лекция успешно изучена
+                        </span>
+                        @if (Model.NextLectureId.HasValue)
+                        {
+                            <a asp-action="Lecture" asp-route-id="@Model.NextLectureId.Value" class="btn btn-primary">
+                                Следующая лекция <i class="bi bi-arrow-right ms-1"></i>
+                            </a>
+                        }
+                    }
+                    else
+                    {
+                        <form asp-action="CompleteReadingLecture" asp-route-id="@Model.Id" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-success btn-lg shadow-sm px-4">
+                                <i class="bi bi-check-circle-fill me-2"></i>Ознакомился с материалом / Завершить изучение
+                            </button>
+                        </form>
+                    }
+                }
+            </div>
         </div>
     </div>
 
     <!-- 2. КОНТРОЛЬНЫЕ ВОПРОСЫ -->
-    <div class="tab-pane fade" id="questions-pane" role="tabpanel" aria-labelledby="questions-tab" tabindex="0">
-        <div class="alert alert-info border shadow-sm mb-4">
-            <div class="d-flex align-items-center gap-2">
-                <i class="bi bi-info-circle-fill fs-5"></i>
-                <div>
-                    Ответьте на все контрольные вопросы по материалу лекции. Для вопросов с выбором или вводом термина система выполняет автоматическую проверку сразу после отправки.
+    @if (hasQuestions)
+    {
+        <div class="tab-pane fade" id="questions-pane" role="tabpanel" aria-labelledby="questions-tab" tabindex="0">
+            <div class="alert alert-info border shadow-sm mb-4">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-info-circle-fill fs-5"></i>
+                    <div>
+                        Ответьте на все контрольные вопросы по материалу лекции. Для вопросов с выбором или вводом термина система выполняет автоматическую проверку сразу после отправки.
+                    </div>
                 </div>
             </div>
-        </div>
 
-        @if (!Model.ControlQuestions.Any())
-        {
-            <div class="card p-4 text-center text-muted">
-                К этой лекции нет контрольных вопросов.
-            </div>
-        }
-        else
-        {
             <div class="d-grid gap-4">
                 @foreach (var q in Model.ControlQuestions)
                 {
@@ -417,8 +537,32 @@
                     </div>
                 }
             </div>
-        }
-    </div>
+
+            <div class="d-flex flex-wrap justify-content-between align-items-center mt-4 pt-3 border-top gap-2">
+                <button type="button" class="btn btn-outline-secondary" onclick="document.getElementById('theory-tab').click()">
+                    <i class="bi bi-arrow-left me-1"></i> Назад к теории
+                </button>
+                @if (hasTest)
+                {
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('test-tab').click()">
+                        Перейти к итоговому тесту <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                }
+                else if (hasReport)
+                {
+                    <button type="button" class="btn btn-primary" onclick="document.getElementById('report-tab').click()">
+                        Сдать отчёт по практике <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                }
+                else
+                {
+                    <a asp-action="Discipline" asp-route-id="@Model.DisciplineId" class="btn btn-outline-primary">
+                        <i class="bi bi-list-check me-1"></i> К списку тем
+                    </a>
+                }
+            </div>
+        </div>
+    }
 
     <!-- 3. ИТОГОВЫЙ ТЕСТ -->
     @if (Model.TestSummary != null)

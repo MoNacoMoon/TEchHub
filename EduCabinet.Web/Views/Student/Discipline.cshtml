@@ -233,7 +233,7 @@
             <span class="badge bg-primary-subtle text-primary border">Шаг @(Math.Min(completedCount + 1, totalCount)) из @totalCount</span>
         </div>
 
-        <div class="roadmap-container">
+        <div class="roadmap-container" style="display: flex; flex-direction: row; justify-content: space-between; align-items: flex-start; overflow-x: auto;">
             <div class="roadmap-line">
                 <div class="roadmap-line-fill" style="width: @Math.Min(100, lineFillPercent)%;"></div>
             </div>
@@ -248,6 +248,7 @@
 
                 <a href="@(lec.Status != LectureAccessStatus.Locked ? Url.Action("Lecture", new { id = lec.Id }) : "#")" 
                    class="roadmap-node @(lec.Status == LectureAccessStatus.Locked ? "pe-none opacity-75" : "")"
+                   style="display: flex; flex-direction: column; align-items: center;"
                    title="@lec.Title (@(lec.Status == LectureAccessStatus.Completed ? "Изучено" : (lec.Status == LectureAccessStatus.Available ? "Доступно сейчас" : "Заблокировано")))">
                     <div class="roadmap-circle @circleClass">
                         <i class="bi @iconClass"></i>
@@ -327,7 +328,23 @@ else
                                     <div class="d-flex flex-wrap gap-2 text-muted small">
                                         @if (lec.HasAttachment)
                                         {
-                                            <span><i class="bi bi-paperclip me-1"></i>Есть конспект (PDF)</span>
+                                            var attExt = System.IO.Path.GetExtension(lec.AttachmentOriginalName ?? "").ToLowerInvariant();
+                                            if (attExt == ".pptx" || attExt == ".ppt")
+                                            {
+                                                <span><i class="bi bi-file-earmark-slides text-primary me-1"></i>Презентация</span>
+                                            }
+                                            else if (attExt == ".docx" || attExt == ".doc")
+                                            {
+                                                <span><i class="bi bi-file-earmark-word text-primary me-1"></i>Документ Word</span>
+                                            }
+                                            else if (attExt == ".pdf")
+                                            {
+                                                <span><i class="bi bi-file-earmark-pdf text-danger me-1"></i>Конспект (PDF)</span>
+                                            }
+                                            else
+                                            {
+                                                <span><i class="bi bi-paperclip me-1"></i>Материалы</span>
+                                            }
                                         }
                                         @if (lec.HasControlQuestions)
                                         {
@@ -356,7 +373,11 @@ else
                                                 <span><i class="bi bi-file-earmark-arrow-up me-1"></i>Сдача отчёта</span>
                                             }
                                         }
-                                        @if (lec.BestTestScore.HasValue)
+                                        @if (!lec.HasControlQuestions && !lec.HasTest && !lec.RequiresReportSubmission)
+                                        {
+                                            <span><i class="bi bi-book text-primary me-1"></i>Теоретический материал</span>
+                                        }
+                                        @if (lec.HasTest && lec.BestTestScore.HasValue)
                                         {
                                             <span class="badge bg-info-subtle text-info border">Тест: @lec.BestTestScore%</span>
                                         }

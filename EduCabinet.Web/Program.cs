@@ -187,6 +187,7 @@ builder.Services.AddScoped<ILectureAccessService, LectureAccessService>();
 builder.Services.AddScoped<IGradingService, GradingService>();
 builder.Services.AddScoped<IEventLogService, EventLogService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IDocumentContentExtractorService, DocumentContentExtractorService>();
 
 // Поддержка MVC и Web API контроллеров
 builder.Services.AddControllersWithViews()

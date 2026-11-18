@@ -157,6 +157,7 @@ public class LectureItemViewModel
     public int OrderIndex { get; set; }
     public LectureAccessStatus Status { get; set; }
     public bool HasAttachment { get; set; }
+    public string? AttachmentOriginalName { get; set; }
     public bool HasTest { get; set; }
     public bool HasControlQuestions { get; set; }
     public bool RequiresReportSubmission { get; set; }
@@ -179,6 +180,8 @@ public class LectureStudyViewModel
     public string? AttachmentFilePath { get; set; }
     public string? AttachmentOriginalName { get; set; }
     public string? AttachmentContentType { get; set; }
+    public string? ExtractedDocumentHtml { get; set; }
+    public bool HasDocumentContent => !string.IsNullOrWhiteSpace(ExtractedDocumentHtml);
     public int OrderIndex { get; set; }
     public bool RequiresManualReview { get; set; }
 
@@ -250,6 +253,7 @@ public class TestSummaryDto
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public int PassingScorePercent { get; set; }
+    public int TotalQuestions { get; set; }
     public int MaxAttempts { get; set; }
     public int? TimeLimitMinutes { get; set; }
     public int AttemptsUsed { get; set; }

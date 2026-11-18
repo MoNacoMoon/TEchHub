@@ -18,6 +18,7 @@ public class StudentController : Controller
     private readonly IEventLogService _eventLogger;
     private readonly IWebHostEnvironment _env;
     private readonly INotificationService _notificationService;
+    private readonly IDocumentContentExtractorService _documentExtractor;
 
     public StudentController(
         AppDbContext db,
@@ -25,7 +26,8 @@ public class StudentController : Controller
         IGradingService gradingService,
         IEventLogService eventLogger,
         IWebHostEnvironment env,
-        INotificationService notificationService)
+        INotificationService notificationService,
+        IDocumentContentExtractorService documentExtractor)
     {
         _db = db;
         _lectureAccessService = lectureAccessService;
@@ -33,6 +35,7 @@ public class StudentController : Controller
         _eventLogger = eventLogger;
         _env = env;
         _notificationService = notificationService;
+        _documentExtractor = documentExtractor;
     }
 
     private int GetCurrentStudentId()
@@ -360,6 +363,7 @@ public class StudentController : Controller
             .Include(d => d.Topics)
                 .ThenInclude(t => t.Lectures)
                     .ThenInclude(l => l.Test)
+                        .ThenInclude(t => t!.Questions)
             .FirstOrDefaultAsync(d => d.Id == id && d.IsActive);
 
         if (discipline == null)
@@ -409,7 +413,8 @@ public class StudentController : Controller
                     OrderIndex = l.OrderIndex,
                     Status = stat?.Status ?? LectureAccessStatus.Locked,
                     HasAttachment = !string.IsNullOrEmpty(l.AttachmentFilePath),
-                    HasTest = l.Test != null && l.Test.IsActive,
+                    AttachmentOriginalName = l.AttachmentOriginalName,
+                    HasTest = l.Test != null && l.Test.IsActive && l.Test.Questions.Any(),
                     HasControlQuestions = l.ControlQuestions.Any(),
                     RequiresReportSubmission = l.RequiresReportSubmission,
                     IsReportApproved = stat?.IsReportApproved ?? false,
@@ -529,6 +534,8 @@ public class StudentController : Controller
             .Include(l => l.ControlQuestions.OrderBy(cq => cq.OrderIndex))
                 .ThenInclude(cq => cq.Options.OrderBy(o => o.OrderIndex))
             .Include(l => l.Test)
+                .ThenInclude(t => t!.Questions)
+            .Include(l => l.Test)
                 .ThenInclude(t => t!.Attempts.Where(a => a.StudentId == studentId).OrderByDescending(a => a.StartedAt))
             .FirstOrDefaultAsync(l => l.Id == id);
 
@@ -644,7 +651,15 @@ public class StudentController : Controller
             });
         }
 
-        if (lecture.Test != null && lecture.Test.IsActive)
+        // Извлечение текстового содержимого прикрепленного документа/презентации (.docx, .pptx, .txt, .md)
+        if (!string.IsNullOrEmpty(lecture.AttachmentFilePath))
+        {
+            var relativePath = lecture.AttachmentFilePath.TrimStart('/', '\\');
+            var fullDiskPath = Path.Combine(_env.WebRootPath, relativePath);
+            model.ExtractedDocumentHtml = _documentExtractor.ExtractContentHtml(fullDiskPath, lecture.AttachmentOriginalName);
+        }
+
+        if (lecture.Test != null && lecture.Test.IsActive && lecture.Test.Questions.Any())
         {
             var attempts = lecture.Test.Attempts.ToList();
             model.TestSummary = new TestSummaryDto
@@ -653,6 +668,7 @@ public class StudentController : Controller
                 Title = lecture.Test.Title,
                 Description = lecture.Test.Description,
                 PassingScorePercent = lecture.Test.PassingScorePercent,
+                TotalQuestions = lecture.Test.Questions.Count,
                 MaxAttempts = lecture.Test.MaxAttempts,
                 TimeLimitMinutes = lecture.Test.TimeLimitMinutes,
                 AttemptsUsed = attempts.Count,
@@ -721,6 +737,107 @@ public class StudentController : Controller
         var fileName = lecture.AttachmentOriginalName ?? Path.GetFileName(fullPath);
 
         return PhysicalFile(fullPath, contentType, fileName);
+    }
+
+    // Подтверждение изучения лекции студентом (для тем без тестов, вопросов и отчетов)
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> CompleteReadingLecture(int id)
+    {
+        int studentId = GetCurrentStudentId();
+        bool canAccess = await _lectureAccessService.CanStudentAccessLectureAsync(studentId, id);
+        if (!canAccess)
+        {
+            TempData["ErrorMessage"] = "У вас нет доступа к этой лекции!";
+            return RedirectToAction(nameof(Index));
+        }
+
+        var lecture = await _db.Lectures
+            .Include(l => l.Topic)
+            .Include(l => l.ControlQuestions)
+            .Include(l => l.Test)
+                .ThenInclude(t => t!.Questions)
+            .FirstOrDefaultAsync(l => l.Id == id);
+
+        if (lecture == null)
+        {
+            return NotFound("Лекция не найдена");
+        }
+
+        var progress = await _db.LectureProgresses
+            .FirstOrDefaultAsync(lp => lp.StudentId == studentId && lp.LectureId == id);
+
+        if (progress == null)
+        {
+            progress = new LectureProgress
+            {
+                StudentId = studentId,
+                LectureId = id,
+                FirstAccessedAt = DateTime.UtcNow
+            };
+            _db.LectureProgresses.Add(progress);
+        }
+
+        if (!lecture.ControlQuestions.Any())
+        {
+            progress.IsControlQuestionsPassed = true;
+        }
+
+        if (lecture.Test == null || !lecture.Test.IsActive || !lecture.Test.Questions.Any())
+        {
+            progress.IsTestPassed = true;
+        }
+
+        if (!lecture.RequiresReportSubmission)
+        {
+            progress.IsReportApproved = true;
+        }
+
+        bool wasCompleted = progress.IsCompleted;
+        bool isAllCompleted = progress.IsControlQuestionsPassed && progress.IsTestPassed && progress.IsReportApproved;
+
+        if (isAllCompleted)
+        {
+            progress.IsCompleted = true;
+            if (!wasCompleted)
+            {
+                progress.CompletedAt = DateTime.UtcNow;
+            }
+
+            await _db.SaveChangesAsync();
+
+            // Проверяем следующую лекцию и отправляем уведомление об открытии доступа
+            var allDisciplineLectures = await _db.Lectures
+                .Include(l => l.Topic)
+                .Where(l => l.Topic.DisciplineId == lecture.Topic.DisciplineId)
+                .OrderBy(l => l.Topic.OrderIndex)
+                .ThenBy(l => l.Topic.Id)
+                .ThenBy(l => l.OrderIndex)
+                .ThenBy(l => l.Id)
+                .ToListAsync();
+
+            int currentIndex = allDisciplineLectures.FindIndex(l => l.Id == id);
+            if (currentIndex >= 0 && currentIndex < allDisciplineLectures.Count - 1)
+            {
+                var nextLecture = allDisciplineLectures[currentIndex + 1];
+                await _notificationService.CreateNotificationAsync(
+                    studentId,
+                    "Новая лекция доступна! 🎉",
+                    $"Вы успешно завершили изучение лекции «{lecture.Title}». Вам открыт доступ к следующей лекции: «{nextLecture.Title}».",
+                    NotificationType.Success,
+                    $"/Student/Lecture/{nextLecture.Id}"
+                );
+            }
+
+            TempData["SuccessMessage"] = "Поздравляем! Вы успешно завершили изучение лекции.";
+        }
+        else
+        {
+            await _db.SaveChangesAsync();
+            TempData["InfoMessage"] = "Материал прочитан. Для завершения лекции выполните оставшиеся задания.";
+        }
+
+        return RedirectToAction(nameof(Lecture), new { id });
     }
 
     // Отправка отчета студентом (Лабораторная / Практическая работа)
