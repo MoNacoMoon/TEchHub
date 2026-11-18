@@ -144,6 +144,22 @@ else
                                     </div>
                                     <div class="text-muted small">
                                         <span>Файл: @r.OriginalFileName</span>
+                                        @if (r.ReportDeadline.HasValue)
+                                        {
+                                            var dlLeft = r.ReportDeadline.Value - DateTime.UtcNow;
+                                            if (r.Status != ReportSubmissionStatus.Approved && dlLeft < TimeSpan.Zero)
+                                            {
+                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle ms-2" title="Дедлайн прошел @r.ReportDeadline.Value.ToLocalTime():dd.MM.yyyy HH:mm">
+                                                    <i class="bi bi-exclamation-octagon me-1"></i>Просрочен дедлайн
+                                                </span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-light text-muted border ms-2" title="Дедлайн сдачи работы">
+                                                    <i class="bi bi-clock-history me-1"></i>Дедлайн: @r.ReportDeadline.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm")
+                                                </span>
+                                            }
+                                        }
                                     </div>
                                 </div>
                             </div>

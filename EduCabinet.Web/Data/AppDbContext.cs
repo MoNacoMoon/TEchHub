@@ -29,6 +29,7 @@ public class AppDbContext : DbContext
     public DbSet<CourseAnnouncement> CourseAnnouncements => Set<CourseAnnouncement>();
     public DbSet<SystemInviteToken> SystemInviteTokens => Set<SystemInviteToken>();
     public DbSet<StudentReportSubmission> StudentReportSubmissions => Set<StudentReportSubmission>();
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -201,5 +202,15 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(s => s.ReviewedByTeacherId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // UserNotification
+        modelBuilder.Entity<UserNotification>()
+            .HasOne(un => un.User)
+            .WithMany()
+            .HasForeignKey(un => un.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<UserNotification>()
+            .HasIndex(un => new { un.UserId, un.IsRead, un.CreatedAt });
     }
 }

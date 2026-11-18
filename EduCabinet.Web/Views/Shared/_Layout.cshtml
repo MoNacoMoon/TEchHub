@@ -128,6 +128,32 @@
 
                 @if (User.Identity?.IsAuthenticated == true)
                 {
+                    <!-- Центр интерактивных уведомлений («Колокольчик») -->
+                    <div class="dropdown notification-dropdown" id="notificationDropdownContainer">
+                        <button type="button" class="btn-notification-bell" id="notificationBellBtn" data-bs-toggle="dropdown" aria-expanded="false" title="Уведомления">
+                            <i class="bi bi-bell-fill"></i>
+                            <span class="notification-badge d-none" id="notificationBadge">0</span>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end shadow-lg p-0 notification-menu" aria-labelledby="notificationBellBtn">
+                            <div class="d-flex justify-content-between align-items-center p-3 border-bottom">
+                                <div class="fw-bold d-flex align-items-center gap-2">
+                                    <i class="bi bi-bell text-primary"></i>
+                                    <span>Уведомления</span>
+                                    <span class="badge bg-primary-subtle text-primary rounded-pill small" id="notificationHeaderCount">0</span>
+                                </div>
+                                <button type="button" class="btn btn-sm btn-link text-decoration-none p-0 text-muted" id="markAllReadBtn" onclick="markAllNotificationsAsRead(event)">
+                                    <i class="bi bi-check2-all me-1"></i>Прочитать все
+                                </button>
+                            </div>
+                            <div class="notification-list" id="notificationList" style="max-height: 380px; overflow-y: auto;">
+                                <div class="text-center py-4 text-muted small" id="notificationEmpty">
+                                    <i class="bi bi-bell-slash fs-3 d-block mb-1 opacity-50"></i>
+                                    Нет новых уведомлений
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     string userName = User.FindFirst("FullName")?.Value ?? User.Identity.Name ?? "Пользователь";
                     string userInitials = "ПК";
                     var nameParts = userName.Split(' ', StringSplitOptions.RemoveEmptyEntries);

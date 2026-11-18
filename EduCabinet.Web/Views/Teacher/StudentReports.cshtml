@@ -61,6 +61,9 @@
         <a asp-action="StudentReports" class="btn btn-sm @(Model.SelectedStatus == null && string.IsNullOrEmpty(Model.SearchQuery) && !Model.SelectedDisciplineId.HasValue && !Model.SelectedGroupId.HasValue ? "btn-secondary" : "btn-outline-secondary")">
             Все (@Model.TotalCount)
         </a>
+        <a asp-action="ExportReportsList" asp-route-disciplineId="@Model.SelectedDisciplineId" asp-route-groupId="@Model.SelectedGroupId" asp-route-status="@Model.SelectedStatus" class="btn btn-sm btn-success" title="Экспорт реестра отчетов в Excel">
+            <i class="bi bi-file-earmark-excel me-1"></i> Экспорт в Excel
+        </a>
     </div>
 </div>
 

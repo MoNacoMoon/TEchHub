@@ -218,6 +218,57 @@ else
 
     <!-- Правая колонка: Календарь активности, Недавние тесты, Сертификаты -->
     <div class="col-lg-4">
+        <!-- Горящие задания и дедлайны -->
+        <div class="craft-card p-3 mb-3 @(Model.Deadlines.Any(d => d.IsOverdue) ? "border-start border-danger border-3" : (Model.Deadlines.Any(d => d.IsUrgent) ? "border-start border-warning border-3" : ""))">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="fw-semibold text-dark d-flex align-items-center gap-1" style="font-size: 0.88rem;">
+                    <i class="bi bi-fire text-danger"></i> Горящие задания и дедлайны
+                </span>
+                @if (Model.Deadlines.Any())
+                {
+                    <span class="badge @(Model.Deadlines.Any(d => d.IsOverdue) ? "bg-danger" : "bg-warning text-dark") font-mono">
+                        @Model.Deadlines.Count
+                    </span>
+                }
+            </div>
+            <div class="text-muted small mb-2">Контроль сроков сдачи отчетов и практических работ</div>
+
+            @if (!Model.Deadlines.Any())
+            {
+                <div class="p-3 text-center bg-light rounded text-muted small">
+                    <i class="bi bi-shield-check text-success fs-4 d-block mb-1"></i>
+                    Все задания сданы вовремя! Горящих дедлайнов нет.
+                </div>
+            }
+            else
+            {
+                <div class="d-flex flex-column gap-2">
+                    @foreach (var dl in Model.Deadlines)
+                    {
+                        <div class="p-2 rounded border bg-body d-flex flex-column gap-1">
+                            <div class="d-flex justify-content-between align-items-start gap-1">
+                                <div class="text-truncate">
+                                    <div class="text-muted" style="font-size: 0.72rem;">@dl.DisciplineTitle</div>
+                                    <a asp-action="Lecture" asp-route-id="@dl.LectureId" class="fw-semibold text-decoration-none text-dark small text-truncate d-block" title="@dl.LectureTitle">
+                                        @dl.LectureTitle
+                                    </a>
+                                </div>
+                                <span class="badge @dl.StatusBadgeClass text-nowrap" style="font-size: 0.72rem;">
+                                    @dl.StatusBadgeText
+                                </span>
+                            </div>
+                            <div class="d-flex justify-content-between align-items-center mt-1 pt-1 border-top" style="font-size: 0.75rem;">
+                                <span class="text-muted">Статус: <span class="@dl.SubmissionBadgeClass" style="font-size: 0.68rem;">@dl.SubmissionStatusText</span></span>
+                                <a asp-action="Lecture" asp-route-id="@dl.LectureId" class="btn btn-link btn-sm p-0 text-decoration-none fw-semibold" style="font-size: 0.75rem;">
+                                    Сдать &rarr;
+                                </a>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+
         <!-- Календарь недели (7 дней активности) -->
         <div class="craft-card p-3 mb-3">
             <div class="d-flex justify-content-between align-items-center mb-1">

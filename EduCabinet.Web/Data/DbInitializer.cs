@@ -36,6 +36,7 @@ public static class DbInitializer
         try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Lectures"" ADD COLUMN ""RequiresReportSubmission"" INTEGER NOT NULL DEFAULT 0;"); } catch { }
         try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Lectures"" ADD COLUMN ""ReportInstructions"" TEXT NULL;"); } catch { }
         try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Lectures"" ADD COLUMN ""MaxReportScore"" INTEGER NULL DEFAULT 100;"); } catch { }
+        try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""Lectures"" ADD COLUMN ""ReportDeadline"" TEXT NULL;"); } catch { }
         try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""LectureProgresses"" ADD COLUMN ""IsReportApproved"" INTEGER NOT NULL DEFAULT 0;"); } catch { }
         try { await context.Database.ExecuteSqlRawAsync(@"ALTER TABLE ""LectureProgresses"" ADD COLUMN ""ReportGrade"" INTEGER NULL;"); } catch { }
 
@@ -108,6 +109,27 @@ public static class DbInitializer
                     CONSTRAINT ""FK_CourseAnnouncements_Disciplines_DisciplineId"" FOREIGN KEY (""DisciplineId"") REFERENCES ""Disciplines"" (""Id"") ON DELETE CASCADE,
                     CONSTRAINT ""FK_CourseAnnouncements_Users_AuthorTeacherId"" FOREIGN KEY (""AuthorTeacherId"") REFERENCES ""Users"" (""Id"") ON DELETE RESTRICT
                 );
+            ");
+        }
+        catch { }
+
+        // Гарантируем наличие таблицы UserNotifications
+        try
+        {
+            await context.Database.ExecuteSqlRawAsync(@"
+                CREATE TABLE IF NOT EXISTS ""UserNotifications"" (
+                    ""Id"" INTEGER PRIMARY KEY AUTOINCREMENT,
+                    ""UserId"" INTEGER NOT NULL,
+                    ""Title"" TEXT NOT NULL,
+                    ""Message"" TEXT NOT NULL,
+                    ""Type"" INTEGER NOT NULL DEFAULT 1,
+                    ""Url"" TEXT NULL,
+                    ""IsRead"" INTEGER NOT NULL DEFAULT 0,
+                    ""CreatedAt"" TEXT NOT NULL,
+                    ""ReadAt"" TEXT NULL,
+                    CONSTRAINT ""FK_UserNotifications_Users_UserId"" FOREIGN KEY (""UserId"") REFERENCES ""Users"" (""Id"") ON DELETE CASCADE
+                );
+                CREATE INDEX IF NOT EXISTS ""IX_UserNotifications_UserId_IsRead"" ON ""UserNotifications"" (""UserId"", ""IsRead"");
             ");
         }
         catch { }

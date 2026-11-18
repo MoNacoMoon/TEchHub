@@ -62,6 +62,7 @@ public class Lecture
     public bool RequiresReportSubmission { get; set; } = false; // Требуется сдача отчета/файла студентом
     public string? ReportInstructions { get; set; } // Инструкции и требования к отчету
     public int? MaxReportScore { get; set; } = 100; // Максимальный балл за отчет
+    public DateTime? ReportDeadline { get; set; } // Дедлайн сдачи работы/отчета студентом
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? UpdatedAt { get; set; }
 

@@ -17,19 +17,22 @@ public class StudentController : Controller
     private readonly IGradingService _gradingService;
     private readonly IEventLogService _eventLogger;
     private readonly IWebHostEnvironment _env;
+    private readonly INotificationService _notificationService;
 
     public StudentController(
         AppDbContext db,
         ILectureAccessService lectureAccessService,
         IGradingService gradingService,
         IEventLogService eventLogger,
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        INotificationService notificationService)
     {
         _db = db;
         _lectureAccessService = lectureAccessService;
         _gradingService = gradingService;
         _eventLogger = eventLogger;
         _env = env;
+        _notificationService = notificationService;
     }
 
     private int GetCurrentStudentId()
@@ -244,6 +247,104 @@ public class StudentController : Controller
             })
             .ToListAsync();
         model.RecentAttempts = recentList;
+
+        // Расчет горящих дедлайнов и заданий студента
+        var activeDisciplineIds = disciplines.Select(d => d.Id).ToList();
+        var deadlineLectures = await _db.Lectures
+            .Include(l => l.Topic)
+                .ThenInclude(t => t.Discipline)
+            .Where(l => activeDisciplineIds.Contains(l.Topic.DisciplineId) && l.RequiresReportSubmission && l.ReportDeadline != null)
+            .ToListAsync();
+
+        if (deadlineLectures.Any())
+        {
+            var deadlineLectureIds = deadlineLectures.Select(l => l.Id).ToList();
+            var studentSubmissions = await _db.StudentReportSubmissions
+                .Where(s => s.StudentId == studentId && deadlineLectureIds.Contains(s.LectureId))
+                .ToListAsync();
+
+            var studentLectureProgresses = await _db.LectureProgresses
+                .Where(lp => lp.StudentId == studentId && deadlineLectureIds.Contains(lp.LectureId))
+                .ToListAsync();
+
+            var now = DateTime.UtcNow;
+            var deadlineItems = new List<StudentDeadlineViewModel>();
+
+            foreach (var lec in deadlineLectures)
+            {
+                var prog = studentLectureProgresses.FirstOrDefault(p => p.LectureId == lec.Id);
+                var sub = studentSubmissions.FirstOrDefault(s => s.LectureId == lec.Id);
+
+                // Если уже зачтено - задание закрыто, скрываем из горящих
+                if (prog?.IsReportApproved == true || sub?.Status == ReportSubmissionStatus.Approved)
+                    continue;
+
+                var deadline = lec.ReportDeadline!.Value;
+                var timeLeft = deadline - now;
+                bool isOverdue = timeLeft < TimeSpan.Zero;
+                bool isUrgent = !isOverdue && timeLeft <= TimeSpan.FromHours(48);
+
+                string statusBadgeText;
+                string statusBadgeClass;
+
+                if (isOverdue)
+                {
+                    var over = TimeSpan.Zero - timeLeft;
+                    string dur = over.TotalDays >= 1 ? $"{(int)over.TotalDays} дн." : $"{(int)over.TotalHours} ч.";
+                    statusBadgeText = $"Просрочен на {dur}";
+                    statusBadgeClass = "bg-danger text-white";
+                }
+                else if (isUrgent)
+                {
+                    string dur = timeLeft.TotalHours >= 1 ? $"{(int)timeLeft.TotalHours} ч." : $"{(int)timeLeft.TotalMinutes} мин.";
+                    statusBadgeText = $"🔥 Осталось: {dur}";
+                    statusBadgeClass = "bg-warning text-dark";
+                }
+                else
+                {
+                    statusBadgeText = $"⏳ До {deadline.ToLocalTime():dd.MM.yyyy HH:mm}";
+                    statusBadgeClass = "bg-secondary-subtle text-secondary";
+                }
+
+                string subStatusText = "Не сдан";
+                string subBadgeClass = "badge bg-secondary";
+
+                if (sub != null)
+                {
+                    if (sub.Status == ReportSubmissionStatus.Pending)
+                    {
+                        subStatusText = "На проверке";
+                        subBadgeClass = "badge bg-warning text-dark";
+                    }
+                    else if (sub.Status == ReportSubmissionStatus.NeedsRevision)
+                    {
+                        subStatusText = "На доработке";
+                        subBadgeClass = "badge bg-danger";
+                    }
+                }
+
+                deadlineItems.Add(new StudentDeadlineViewModel
+                {
+                    LectureId = lec.Id,
+                    LectureTitle = lec.Title,
+                    DisciplineTitle = lec.Topic.Discipline.Title,
+                    Deadline = deadline,
+                    TimeLeft = timeLeft,
+                    IsOverdue = isOverdue,
+                    IsUrgent = isUrgent,
+                    StatusBadgeText = statusBadgeText,
+                    StatusBadgeClass = statusBadgeClass,
+                    SubmissionStatusText = subStatusText,
+                    SubmissionBadgeClass = subBadgeClass
+                });
+            }
+
+            model.Deadlines = deadlineItems
+                .OrderByDescending(d => d.IsOverdue)
+                .ThenBy(d => d.Deadline)
+                .Take(6)
+                .ToList();
+        }
 
         return View(model);
     }
@@ -741,6 +842,19 @@ public class StudentController : Controller
             HttpContext.Connection.RemoteIpAddress?.ToString()
         );
 
+        // Интерактивное уведомление преподавателям курса
+        try
+        {
+            await _notificationService.NotifyDisciplineTeachersAsync(
+                lecture.Topic.DisciplineId,
+                "📥 Сдан новый отчет",
+                $"Студент {student?.FullName ?? "Студент"} отправил отчет по лекции «{lecture.Title}».",
+                Models.Entities.NotificationType.Info,
+                $"/Teacher/StudentReports?disciplineId={lecture.Topic.DisciplineId}"
+            );
+        }
+        catch { }
+
         TempData["SuccessMessage"] = "Отчёт успешно загружен и отправлен преподавателю на проверку!";
         return RedirectToAction(nameof(Lecture), new { id = lectureId });
     }
@@ -844,6 +958,7 @@ public class StudentController : Controller
                 Status = r.Status,
                 Grade = r.Grade,
                 MaxScore = r.Lecture.MaxReportScore ?? 100,
+                ReportDeadline = r.Lecture.ReportDeadline,
                 TeacherFeedback = r.TeacherFeedback,
                 ReviewedAt = r.ReviewedAt,
                 ReviewedByTeacherName = r.ReviewedByTeacher?.FullName,

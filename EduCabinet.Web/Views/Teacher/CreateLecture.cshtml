@@ -76,7 +76,7 @@
 
                         <div id="reportSettingsBlock" style="display: @(Model.RequiresReportSubmission ? "block" : "none");">
                             <div class="row g-3">
-                                <div class="col-md-9">
+                                <div class="col-md-6">
                                     <label asp-for="ReportInstructions" class="form-label fw-semibold">Инструкции и требования к отчету</label>
                                     <textarea asp-for="ReportInstructions" class="form-control" rows="3" placeholder="Укажите задание для студента (например: прикрепить отчет в формате DOCX/PDF по ГОСТу, приложить расчеты или архив с кодом)..."></textarea>
                                     <span asp-validation-for="ReportInstructions" class="text-danger small"></span>
@@ -85,6 +85,14 @@
                                     <label asp-for="MaxReportScore" class="form-label fw-semibold">Максимальный балл</label>
                                     <input asp-for="MaxReportScore" type="number" class="form-control" min="1" max="1000" />
                                     <span asp-validation-for="MaxReportScore" class="text-danger small"></span>
+                                </div>
+                                <div class="col-md-3">
+                                    <label asp-for="ReportDeadline" class="form-label fw-semibold">
+                                        <i class="bi bi-clock-history text-danger me-1"></i>Дедлайн сдачи
+                                    </label>
+                                    <input asp-for="ReportDeadline" type="datetime-local" class="form-control" />
+                                    <div class="form-text small text-muted">Необязательно. Если указан, студенты увидят таймер.</div>
+                                    <span asp-validation-for="ReportDeadline" class="text-danger small"></span>
                                 </div>
                             </div>
                         </div>

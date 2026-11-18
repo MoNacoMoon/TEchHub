@@ -8204,3 +8204,92 @@ html.dark .btn-primary:hover {
     padding-right: 0.25rem;
   }
 }
+
+/* ==========================================================================
+   NOTIFICATION BELL & DROPDOWN (TECHHUB)
+   ========================================================================== */
+.notification-dropdown {
+  position: relative;
+}
+
+.btn-notification-bell {
+  position: relative;
+  background: var(--bg-surface);
+  border: 1px solid var(--hairline-strong);
+  color: var(--text-primary);
+  border-radius: 9999px;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-notification-bell:hover {
+  background: var(--bg-surface-raised);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.notification-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  border: 2px solid var(--bg-surface);
+  animation: pulse-badge 2s infinite;
+}
+
+@keyframes pulse-badge {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.notification-menu {
+  width: 340px;
+  max-width: 90vw;
+  border-radius: var(--radius-md, 12px) !important;
+  border: 1px solid var(--hairline-strong) !important;
+  background-color: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1) !important;
+  z-index: 1060;
+}
+
+.notification-item {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--hairline);
+  transition: background 0.15s ease;
+  cursor: pointer;
+  display: block;
+  text-decoration: none !important;
+  color: inherit !important;
+}
+
+.notification-item:hover {
+  background: var(--bg-surface-raised);
+}
+
+.notification-item.unread {
+  background: var(--accent-subtle, rgba(56, 189, 248, 0.08));
+  border-left: 3px solid var(--accent, #38bdf8);
+}
+
+.notification-item:last-child {
+  border-bottom: none;
+}

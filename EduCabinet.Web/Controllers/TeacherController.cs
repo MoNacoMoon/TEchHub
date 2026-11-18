@@ -17,17 +17,20 @@ public class TeacherController : Controller
     private readonly ILectureAccessService _lectureAccessService;
     private readonly IEventLogService _eventLogger;
     private readonly IWebHostEnvironment _env;
+    private readonly INotificationService _notificationService;
 
     public TeacherController(
         AppDbContext db,
         ILectureAccessService lectureAccessService,
         IEventLogService eventLogger,
-        IWebHostEnvironment env)
+        IWebHostEnvironment env,
+        INotificationService notificationService)
     {
         _db = db;
         _lectureAccessService = lectureAccessService;
         _eventLogger = eventLogger;
         _env = env;
+        _notificationService = notificationService;
     }
 
     private static readonly HashSet<string> AllowedAttachmentExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -478,7 +481,8 @@ public class TeacherController : Controller
             OrderIndex = maxOrder + 1,
             RequiresManualReview = true,
             RequiresReportSubmission = false,
-            MaxReportScore = 100
+            MaxReportScore = 100,
+            ReportDeadline = null
         };
         return View(model);
     }
@@ -500,6 +504,7 @@ public class TeacherController : Controller
             RequiresReportSubmission = model.RequiresReportSubmission,
             ReportInstructions = model.ReportInstructions?.Trim(),
             MaxReportScore = model.MaxReportScore,
+            ReportDeadline = model.ReportDeadline.HasValue ? DateTime.SpecifyKind(model.ReportDeadline.Value, DateTimeKind.Utc) : null,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -582,6 +587,7 @@ public class TeacherController : Controller
             RequiresReportSubmission = lecture.RequiresReportSubmission,
             ReportInstructions = lecture.ReportInstructions,
             MaxReportScore = lecture.MaxReportScore,
+            ReportDeadline = lecture.ReportDeadline,
             ExistingAttachmentName = lecture.AttachmentOriginalName,
             ExistingAttachmentPath = lecture.AttachmentFilePath
         };
@@ -606,6 +612,7 @@ public class TeacherController : Controller
         lecture.RequiresReportSubmission = model.RequiresReportSubmission;
         lecture.ReportInstructions = model.ReportInstructions?.Trim();
         lecture.MaxReportScore = model.MaxReportScore;
+        lecture.ReportDeadline = model.ReportDeadline.HasValue ? DateTime.SpecifyKind(model.ReportDeadline.Value, DateTimeKind.Utc) : null;
         lecture.UpdatedAt = DateTime.UtcNow;
 
         // Если загружен новый файл для замены
@@ -1405,6 +1412,35 @@ public class TeacherController : Controller
             HttpContext.Connection.RemoteIpAddress?.ToString()
         );
 
+        // Интерактивное уведомление студенту в реальном времени
+        var (notifTitle, notifMsg, notifType) = model.Status switch
+        {
+            ReportSubmissionStatus.Approved => (
+                "🎉 Отчет зачтен!",
+                $"Преподаватель проверил ваш отчет по лекции «{report.Lecture.Title}». Оценка: {report.Grade ?? 0}/{report.Lecture.MaxReportScore ?? 100} б.{(string.IsNullOrWhiteSpace(report.TeacherFeedback) ? "" : $" Комментарий: {report.TeacherFeedback}")}",
+                NotificationType.Success
+            ),
+            ReportSubmissionStatus.NeedsRevision => (
+                "📝 Требуется доработка отчета",
+                $"Преподаватель вернул ваш отчет по лекции «{report.Lecture.Title}» на доработку.{(string.IsNullOrWhiteSpace(report.TeacherFeedback) ? "" : $" Замечания: {report.TeacherFeedback}")}",
+                NotificationType.Warning
+            ),
+            ReportSubmissionStatus.Rejected => (
+                "❌ Отчет отклонен",
+                $"Ваш отчет по лекции «{report.Lecture.Title}» отклонен.{(string.IsNullOrWhiteSpace(report.TeacherFeedback) ? "" : $" Причина: {report.TeacherFeedback}")}",
+                NotificationType.Danger
+            ),
+            _ => ("ℹ️ Отчет проверен", $"Статус отчета по лекции «{report.Lecture.Title}» обновлен.", NotificationType.Info)
+        };
+
+        await _notificationService.CreateNotificationAsync(
+            report.StudentId,
+            notifTitle,
+            notifMsg,
+            notifType,
+            $"/Student/Lecture/{report.LectureId}"
+        );
+
         TempData["SuccessMessage"] = $"Отчёт студента {report.Student.FullName} проверен (статус: {statusLabel})";
         return RedirectToAction(nameof(StudentReports));
     }
@@ -1653,13 +1689,17 @@ public class TeacherController : Controller
         return View(model);
     }
 
-    // Экспорт матрицы успеваемости группы в CSV/Excel
+    // Экспорт ведомости успеваемости группы в Excel / CSV в 1 клик
+    [HttpGet]
+    public async Task<IActionResult> ExportGradebook(int disciplineId, int? groupId) => await ExportGroupReport(disciplineId, groupId);
+
     [HttpGet]
     public async Task<IActionResult> ExportGroupReport(int disciplineId, int? groupId)
     {
         var discipline = await _db.Disciplines
             .Include(d => d.Topics.OrderBy(t => t.OrderIndex))
                 .ThenInclude(t => t.Lectures.OrderBy(l => l.OrderIndex))
+                    .ThenInclude(l => l.Test)
             .FirstOrDefaultAsync(d => d.Id == disciplineId);
 
         if (discipline == null) return NotFound();
@@ -1669,62 +1709,220 @@ public class TeacherController : Controller
             .SelectMany(t => t.Lectures.OrderBy(l => l.OrderIndex))
             .ToList();
 
+        var lectureIds = allLectures.Select(l => l.Id).ToList();
+
         var studentsQuery = _db.Users
             .Include(u => u.GroupMemberships)
                 .ThenInclude(gm => gm.Group)
             .Where(u => u.Role == UserRole.Student && u.IsActive);
 
+        string groupFilterName = "Все_группы";
         if (groupId.HasValue)
         {
             studentsQuery = studentsQuery.Where(u => u.GroupMemberships.Any(gm => gm.GroupId == groupId.Value));
+            var groupObj = await _db.StudentGroups.FindAsync(groupId.Value);
+            if (groupObj != null) groupFilterName = groupObj.Name;
         }
 
         var students = await studentsQuery.OrderBy(u => u.FullName).ToListAsync();
+        var studentIds = students.Select(s => s.Id).ToList();
+
+        var progresses = await _db.LectureProgresses
+            .Where(lp => studentIds.Contains(lp.StudentId) && lectureIds.Contains(lp.LectureId))
+            .ToListAsync();
+
+        var attempts = await _db.TestAttempts
+            .Where(ta => studentIds.Contains(ta.StudentId) && ta.CompletedAt != null)
+            .ToListAsync();
+
+        var reports = await _db.StudentReportSubmissions
+            .Where(r => studentIds.Contains(r.StudentId) && lectureIds.Contains(r.LectureId))
+            .ToListAsync();
 
         var sb = new System.Text.StringBuilder();
-        sb.Append("№;ФИО обучающегося;Группа;Пройдено лекций;Процент освоения");
+        sb.Append("№;ФИО обучающегося;Группа;Пройдено лекций;Освоение плана (%)");
+
         foreach (var lec in allLectures)
         {
-            sb.Append($";Лекция {lec.OrderIndex}: {lec.Title.Replace(";", ",")}");
+            string safeLecTitle = lec.Title.Replace(";", ",");
+            if (lec.Test != null)
+            {
+                sb.Append($";Тест: {safeLecTitle} (%)");
+            }
+            if (lec.RequiresReportSubmission)
+            {
+                sb.Append($";Отчет: {safeLecTitle} (Балл/{lec.MaxReportScore ?? 100})");
+            }
+            sb.Append($";Статус: {safeLecTitle}");
         }
+
+        sb.Append(";Средний балл тестов (%);Средний балл отчетов (%);Итоговый рейтинг (%);Академическая оценка;Итоговый зачет");
         sb.AppendLine();
 
         int num = 1;
         foreach (var s in students)
         {
-            var prog = await _lectureAccessService.GetDisciplineProgressAsync(s.Id, disciplineId);
+            var studentProgressList = progresses.Where(p => p.StudentId == s.Id).ToList();
+            var studentAttempts = attempts.Where(a => a.StudentId == s.Id).ToList();
+            var studentReports = reports.Where(r => r.StudentId == s.Id).ToList();
+
+            int completedLectures = studentProgressList.Count(p => p.IsCompleted);
+            int totalLectures = allLectures.Count;
+            int progressPercent = totalLectures > 0 ? (int)Math.Round((double)completedLectures / totalLectures * 100) : 0;
             string gName = s.GroupMemberships.FirstOrDefault()?.Group.Name ?? "Без группы";
-            sb.Append($"{num++};\"{s.FullName}\";\"{gName}\";{prog.CompletedLectures}/{prog.TotalLectures};{prog.ProgressPercent}%");
+
+            sb.Append($"{num++};\"{s.FullName}\";\"{gName}\";{completedLectures}/{totalLectures};{progressPercent}%");
+
+            var testScores = new List<double>();
+            var reportScores = new List<double>();
 
             foreach (var lec in allLectures)
             {
-                var lp = prog.Lectures.FirstOrDefault(l => l.LectureId == lec.Id);
-                string cell = "Закрыто";
-                if (lp != null)
+                var lp = studentProgressList.FirstOrDefault(p => p.LectureId == lec.Id);
+
+                // Тест
+                if (lec.Test != null)
                 {
-                    if (lp.Status == LectureAccessStatus.Completed)
+                    var atts = studentAttempts.Where(a => a.TestId == lec.Test.Id).ToList();
+                    if (atts.Any())
                     {
-                        cell = lp.BestTestScore.HasValue ? $"Сдано ({lp.BestTestScore}%)" : "Изучено";
+                        var bestScore = atts.Max(a => a.ScorePercent);
+                        testScores.Add(bestScore);
+                        sb.Append($";{bestScore}%");
                     }
-                    else if (lp.Status == LectureAccessStatus.Available)
+                    else
                     {
-                        cell = "Доступно";
-                    }
-                    else if (lp.IsManuallyUnlocked)
-                    {
-                        cell = "Открыто вручную";
+                        sb.Append(";Не сдан");
                     }
                 }
-                sb.Append($";\"{cell}\"");
+
+                // Отчет
+                if (lec.RequiresReportSubmission)
+                {
+                    var rep = studentReports.FirstOrDefault(r => r.LectureId == lec.Id);
+                    if (rep != null)
+                    {
+                        if (rep.Status == ReportSubmissionStatus.Approved && rep.Grade.HasValue)
+                        {
+                            reportScores.Add(rep.Grade.Value);
+                            sb.Append($";{rep.Grade}/{lec.MaxReportScore ?? 100} (Зачтено)");
+                        }
+                        else if (rep.Status == ReportSubmissionStatus.NeedsRevision)
+                        {
+                            sb.Append(";На доработке");
+                        }
+                        else if (rep.Status == ReportSubmissionStatus.Rejected)
+                        {
+                            sb.Append(";Не зачтено");
+                        }
+                        else
+                        {
+                            sb.Append(";На проверке");
+                        }
+                    }
+                    else
+                    {
+                        sb.Append(";Не сдан");
+                    }
+                }
+
+                // Статус лекции
+                string status = "Закрыто";
+                if (lp != null)
+                {
+                    if (lp.IsCompleted) status = "Завершено";
+                    else if (lp.IsManuallyUnlocked) status = "Открыто вручную";
+                    else status = "В процессе";
+                }
+                sb.Append($";\"{status}\"");
             }
+
+            double avgTest = testScores.Any() ? Math.Round(testScores.Average(), 1) : 0;
+            double avgReport = reportScores.Any() ? Math.Round(reportScores.Average(), 1) : 0;
+            double finalRating = testScores.Any() && reportScores.Any() 
+                ? Math.Round((avgTest + avgReport) / 2.0, 1)
+                : (testScores.Any() ? avgTest : (reportScores.Any() ? avgReport : 0));
+
+            string academicGrade = finalRating switch
+            {
+                >= 85 => "Отлично (5)",
+                >= 70 => "Хорошо (4)",
+                >= 50 => "Удовлетворительно (3)",
+                _ => "Неудовлетворительно (2)"
+            };
+
+            string passStatus = (progressPercent >= 80 && finalRating >= 50) ? "ЗАЧТЕНО" : "НЕ ЗАЧТЕНО";
+
+            sb.Append($";{avgTest}%;{avgReport};{finalRating}%;\"{academicGrade}\";\"{passStatus}\"");
             sb.AppendLine();
         }
 
         var encoding = new System.Text.UTF8Encoding(true); // UTF-8 with BOM
         byte[] bytes = encoding.GetBytes(sb.ToString());
         string safeDiscTitle = string.Concat(discipline.Title.Split(Path.GetInvalidFileNameChars())).Replace(" ", "_");
-        string fileName = $"Успеваемость_{safeDiscTitle}_{DateTime.Now:yyyyMMdd_HHmm}.csv";
+        string safeGroup = string.Concat(groupFilterName.Split(Path.GetInvalidFileNameChars())).Replace(" ", "_");
+        string fileName = $"Ведомость_{safeDiscTitle}_{safeGroup}_{DateTime.Now:yyyyMMdd_HHmm}.csv";
 
+        return File(bytes, "text/csv; charset=utf-8", fileName);
+    }
+
+    // Экспорт реестра всех сданных отчетов и практических работ
+    [HttpGet]
+    public async Task<IActionResult> ExportReportsList(int? disciplineId, int? groupId, ReportSubmissionStatus? status)
+    {
+        var query = _db.StudentReportSubmissions
+            .Include(r => r.Lecture)
+                .ThenInclude(l => l.Topic)
+                    .ThenInclude(t => t.Discipline)
+            .Include(r => r.Student)
+                .ThenInclude(s => s.GroupMemberships)
+                    .ThenInclude(gm => gm.Group)
+            .Include(r => r.ReviewedByTeacher)
+            .AsQueryable();
+
+        if (disciplineId.HasValue && disciplineId.Value > 0)
+        {
+            query = query.Where(r => r.Lecture.Topic.DisciplineId == disciplineId.Value);
+        }
+
+        if (groupId.HasValue && groupId.Value > 0)
+        {
+            query = query.Where(r => r.Student.GroupMemberships.Any(gm => gm.GroupId == groupId.Value));
+        }
+
+        if (status.HasValue)
+        {
+            query = query.Where(r => r.Status == status.Value);
+        }
+
+        var reports = await query.OrderByDescending(r => r.SubmittedAt).ToListAsync();
+
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("№;Дата сдачи;Студент;Группа;Дисциплина;Лекция;Дедлайн;Статус;Оценка;Макс. балл;Преподаватель;Дата проверки;Имя файла;Замечания преподавателя");
+
+        int num = 1;
+        foreach (var r in reports)
+        {
+            string studentGroup = r.Student.GroupMemberships.FirstOrDefault()?.Group.Name ?? "Без группы";
+            string statusStr = r.Status switch
+            {
+                ReportSubmissionStatus.Approved => "Зачтено",
+                ReportSubmissionStatus.NeedsRevision => "На доработке",
+                ReportSubmissionStatus.Rejected => "Не зачтено",
+                _ => "На проверке"
+            };
+            string deadlineStr = r.Lecture.ReportDeadline.HasValue ? r.Lecture.ReportDeadline.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "Не установлен";
+            string reviewedAtStr = r.ReviewedAt.HasValue ? r.ReviewedAt.Value.ToLocalTime().ToString("dd.MM.yyyy HH:mm") : "-";
+            string teacherName = r.ReviewedByTeacher?.FullName ?? "-";
+            string feedback = (r.TeacherFeedback ?? "").Replace(";", ",").Replace("\n", " ").Replace("\r", " ");
+
+            sb.Append($"{num++};{r.SubmittedAt.ToLocalTime():dd.MM.yyyy HH:mm};\"{r.Student.FullName}\";\"{studentGroup}\";\"{r.Lecture.Topic.Discipline.Title}\";\"{r.Lecture.Title}\";\"{deadlineStr}\";\"{statusStr}\";{r.Grade?.ToString() ?? "-"};{r.Lecture.MaxReportScore ?? 100};\"{teacherName}\";\"{reviewedAtStr}\";\"{r.OriginalFileName}\";\"{feedback}\"");
+            sb.AppendLine();
+        }
+
+        var encoding = new System.Text.UTF8Encoding(true);
+        byte[] bytes = encoding.GetBytes(sb.ToString());
+        string fileName = $"Реестр_отчетов_{DateTime.Now:yyyyMMdd_HHmm}.csv";
         return File(bytes, "text/csv; charset=utf-8", fileName);
     }
 
@@ -1749,6 +1947,15 @@ public class TeacherController : Controller
 
         if (success)
         {
+            var lectureTitle = await _db.Lectures.Where(l => l.Id == model.LectureId).Select(l => l.Title).FirstOrDefaultAsync() ?? "Лекция";
+            await _notificationService.CreateNotificationAsync(
+                model.StudentId,
+                "🔓 Доступ к лекции открыт!",
+                $"Преподаватель открыл вам доступ к лекции «{lectureTitle}». Причина: {model.Reason ?? "по решению преподавателя"}.",
+                NotificationType.Success,
+                $"/Student/Lecture/{model.LectureId}"
+            );
+
             TempData["SuccessMessage"] = "Лекция успешно открыта студенту вручную. Событие зарегистрировано в журнале аудита.";
         }
         else
@@ -1792,6 +1999,14 @@ public class TeacherController : Controller
             student.FullName,
             test.Lecture.Title,
             HttpContext.Connection.RemoteIpAddress?.ToString()
+        );
+
+        await _notificationService.CreateNotificationAsync(
+            model.StudentId,
+            "🔄 Попытки теста сброшены",
+            $"Преподаватель сбросил ваши попытки по тесту «{test.Title}» (лекция «{test.Lecture.Title}»). Вы можете пройти тестирование заново.",
+            NotificationType.Info,
+            $"/Student/Lecture/{test.LectureId}"
         );
 
         TempData["SuccessMessage"] = $"Попытки тестирования для студента {student.FullName} успешно сброшены";

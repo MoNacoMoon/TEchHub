@@ -414,3 +414,124 @@ window.searchDisciplines = function (query) {
         }
     });
 };
+
+// ==========================================================================
+// 9. ЦЕНТР ИНТЕРАКТИВНЫХ УВЕДОМЛЕНИЙ (NOTIFICATIONS CLIENT)
+// ==========================================================================
+window.initNotificationCenter = function() {
+    const bellBtn = document.getElementById('notificationBellBtn');
+    if (!bellBtn) return; // Not logged in
+
+    window.fetchNotifications();
+
+    // Опрос каждые 30 секунд для обновления бейджа без перезагрузки страницы
+    setInterval(window.fetchNotifications, 30000);
+};
+
+window.fetchNotifications = async function() {
+    try {
+        const resp = await fetch('/Notification/GetRecent');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        window.updateNotificationUI(data.unreadCount || 0, data.notifications || []);
+    } catch (e) {
+        // silent fail on network errors
+    }
+};
+
+window.updateNotificationUI = function(unreadCount, notifications) {
+    const badge = document.getElementById('notificationBadge');
+    const headerCount = document.getElementById('notificationHeaderCount');
+    const list = document.getElementById('notificationList');
+
+    if (badge) {
+        if (unreadCount > 0) {
+            badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+            badge.classList.remove('d-none');
+        } else {
+            badge.classList.add('d-none');
+        }
+    }
+
+    if (headerCount) {
+        headerCount.textContent = unreadCount;
+    }
+
+    if (!list) return;
+
+    if (!notifications || notifications.length === 0) {
+        list.innerHTML = `
+            <div class="text-center py-4 text-muted small" id="notificationEmpty">
+                <i class="bi bi-bell-slash fs-3 d-block mb-1 opacity-50"></i>
+                Нет новых уведомлений
+            </div>
+        `;
+        return;
+    }
+
+    let html = '';
+    for (const n of notifications) {
+        const unreadClass = !n.isRead ? 'unread' : '';
+        const iconInfo = window.getNotificationIcon(n.type);
+        html += `
+            <a href="${n.url || 'javascript:void(0)'}" class="notification-item ${unreadClass}" onclick="handleNotificationClick(event, ${n.id}, '${n.url || ''}')">
+                <div class="d-flex align-items-start gap-2">
+                    <span class="${iconInfo.iconClass} fs-5 flex-shrink-0 mt-1"></span>
+                    <div class="flex-grow-1 overflow-hidden">
+                        <div class="d-flex justify-content-between align-items-baseline gap-1">
+                            <span class="fw-semibold small text-truncate ${!n.isRead ? 'text-primary' : 'text-dark'}">${escapeHtml(n.title)}</span>
+                            <span class="text-muted font-mono" style="font-size: 0.68rem;">${escapeHtml(n.timeAgo)}</span>
+                        </div>
+                        <div class="text-muted small text-break mt-1" style="font-size: 0.78rem; line-height: 1.35;">${escapeHtml(n.message)}</div>
+                    </div>
+                </div>
+            </a>
+        `;
+    }
+    list.innerHTML = html;
+};
+
+window.getNotificationIcon = function(type) {
+    switch (type) {
+        case 'success':
+            return { iconClass: 'bi bi-check-circle-fill text-success' };
+        case 'warning':
+            return { iconClass: 'bi bi-exclamation-triangle-fill text-warning' };
+        case 'danger':
+            return { iconClass: 'bi bi-x-circle-fill text-danger' };
+        default:
+            return { iconClass: 'bi bi-info-circle-fill text-primary' };
+    }
+};
+
+window.handleNotificationClick = async function(e, id, url) {
+    if (e) e.preventDefault();
+    try {
+        await fetch('/Notification/MarkAsRead?id=' + id, { method: 'POST' });
+    } catch(err) {}
+
+    if (url && url !== 'javascript:void(0)') {
+        window.location.href = url;
+    } else {
+        window.fetchNotifications();
+    }
+};
+
+window.markAllNotificationsAsRead = async function(e) {
+    if (e) e.preventDefault();
+    try {
+        const resp = await fetch('/Notification/MarkAllAsRead', { method: 'POST' });
+        if (resp.ok) {
+            window.fetchNotifications();
+        }
+    } catch (err) {}
+};
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    window.initNotificationCenter();
+});

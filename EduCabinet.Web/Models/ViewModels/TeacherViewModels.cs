@@ -201,6 +201,9 @@ public class LectureEditViewModel
     [Range(1, 1000, ErrorMessage = "Максимальный балл должен быть от 1 до 1000")]
     public int? MaxReportScore { get; set; } = 100;
 
+    [Display(Name = "Крайний срок сдачи отчета (дедлайн)")]
+    public DateTime? ReportDeadline { get; set; }
+
     [Display(Name = "Файл материала (PDF, DOCX и др.)")]
     public IFormFile? AttachmentFile { get; set; }
 

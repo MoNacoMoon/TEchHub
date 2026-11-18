@@ -43,6 +43,24 @@ public class StudentDashboardViewModel
 
     // Лента последних результатов тестирования
     public List<StudentRecentAttemptDto> RecentAttempts { get; set; } = new();
+
+    // Горящие задания и дедлайны
+    public List<StudentDeadlineViewModel> Deadlines { get; set; } = new();
+}
+
+public class StudentDeadlineViewModel
+{
+    public int LectureId { get; set; }
+    public string LectureTitle { get; set; } = string.Empty;
+    public string DisciplineTitle { get; set; } = string.Empty;
+    public DateTime Deadline { get; set; }
+    public TimeSpan TimeLeft { get; set; }
+    public bool IsOverdue { get; set; }
+    public bool IsUrgent { get; set; }
+    public string StatusBadgeText { get; set; } = string.Empty;
+    public string StatusBadgeClass { get; set; } = string.Empty;
+    public string SubmissionStatusText { get; set; } = string.Empty;
+    public string SubmissionBadgeClass { get; set; } = string.Empty;
 }
 
 public class SpotlightLectureDto
@@ -335,6 +353,7 @@ public class StudentReportItemDto
     public ReportSubmissionStatus Status { get; set; }
     public int? Grade { get; set; }
     public int? MaxScore { get; set; }
+    public DateTime? ReportDeadline { get; set; }
     public string? TeacherFeedback { get; set; }
     public DateTime? ReviewedAt { get; set; }
     public string? ReviewedByTeacherName { get; set; }

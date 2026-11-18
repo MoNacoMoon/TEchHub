@@ -186,6 +186,7 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ILectureAccessService, LectureAccessService>();
 builder.Services.AddScoped<IGradingService, GradingService>();
 builder.Services.AddScoped<IEventLogService, EventLogService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
 
 // Поддержка MVC и Web API контроллеров
 builder.Services.AddControllersWithViews()
